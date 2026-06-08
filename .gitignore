@@ -1,2 +1,6 @@
+__pycache__/
+*.pyc
 .venv
-env
+config.py
+.env
+*/node_modules
