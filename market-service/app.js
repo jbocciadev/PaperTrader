@@ -1,9 +1,13 @@
 import dotenv from "dotenv";
 import axios from "axios";
+import { createClient, ReconnectStrategyError, RedisClient } from "redis";
 
 dotenv.config({
     path: "../.env",
 });
+
+const redisClient = createClient({ url: process.env.REDIS_URL });
+redisClient.on("error", (err) => console.error("Redis client error: ", err));
 
 // Finnhub API client setup
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -50,4 +54,13 @@ async function openingPrices() {
     }
 }
 
-openingPrices();
+async function startApp() {
+    // Connect to the redis service
+    await redisClient.connect();
+    console.log("Connected to Redis server successfully");
+
+    // poll market prices for the tickers in the list
+    await openingPrices();
+}
+
+startApp();

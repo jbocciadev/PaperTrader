@@ -12,3 +12,5 @@ Notes:
 - market-service:
     - Changed from Alpha vantage to finnhub as there was a strict limit usage for the free tier service.
     - Implemented the "cURL" query version for the symbol quotes so as to avoid version compatibility issues with finnhub's own js package.
+
+9/06: Moved files out of OneDrive to avoid multi-platform issues. Going forward, syncing with github only.
