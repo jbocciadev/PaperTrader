@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import axios from "axios";
-import { createClient, ReconnectStrategyError, RedisClient } from "redis";
+import { createClient } from "redis";
 
 dotenv.config({
     path: "../.env",
@@ -37,7 +37,7 @@ async function openingPrices() {
         const results = await Promise.all(promises);
 
         // Parse responses into object
-        for (let result of results) {
+        for (const result of results) {
             openingValues[result.ticker] = result.data;
         }
 
