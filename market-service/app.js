@@ -2,10 +2,12 @@ import dotenv from "dotenv";
 import axios from "axios";
 import { createClient } from "redis";
 
+// Configure environment variables
 dotenv.config({
     path: "../.env",
 });
 
+// Configure Redis cloud database
 const redisClient = createClient({ url: process.env.REDIS_URL });
 redisClient.on("error", (err) => console.error("Redis client error: ", err));
 
@@ -39,6 +41,11 @@ async function openingPrices() {
         // Parse responses into object
         for (const result of results) {
             openingValues[result.ticker] = result.data;
+            // Send values to redis server
+            // Redis namespace convention uses colons for categorisation
+            const redisKey = `stock:${result.ticker}:snapshot`;
+
+            await redisClient.set(redisKey, JSON.stringify(result.data));
         }
 
         // for (let ticker of tickers) {
