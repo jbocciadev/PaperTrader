@@ -5,7 +5,7 @@ import WebSocket from "ws";
 
 // Configure environment variables
 dotenv.config({
-    path: "../.env",
+    path: ".env",
 });
 
 // Configure Redis cloud database
@@ -101,7 +101,10 @@ async function startWebsocket() {
 
                     // Send info to Redis cloud server
                     const redisPriceKey = `stock:${ticker}:price`;
-                    await redisClient.set(redisPriceKey, lastPrice.toString());
+                    await redisClient.set(
+                        redisPriceKey,
+                        latestPrice.toString(),
+                    );
                     console.log(
                         `Last price update ---> ${ticker}: $ ${latestPrice}`,
                     );
