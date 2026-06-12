@@ -14,3 +14,4 @@ Notes:
     - Implemented the "cURL" query version for the symbol quotes so as to avoid version compatibility issues with finnhub's own js package.
 
 9/06: Moved files out of OneDrive to avoid multi-platform issues. Going forward, syncing with github only.
+13/06: Out of hours: The application will allow users to execute trades outside of US market hours. However, in a production environment, these would be prevented by checking data/time stamp.

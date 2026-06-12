@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import axios from "axios";
-import { createClient } from "redis";
+import { createClient, ErrorReply } from "redis";
+import WebSocket from "ws";
 
 // Configure environment variables
 dotenv.config({
@@ -8,7 +9,13 @@ dotenv.config({
 });
 
 // Configure Redis cloud database
-const redisClient = createClient({ url: process.env.REDIS_URL });
+const redisClient = createClient({
+    url: process.env.REDIS_URL,
+    socket: {
+        connectTimeout: 10000, // Wait max 10 seconds to connect
+        keepAlive: 5000, // Check connection is alive by pinging the server every 5 seconds
+    },
+});
 redisClient.on("error", (err) => console.error("Redis client error: ", err));
 
 // Finnhub API client setup
@@ -61,6 +68,64 @@ async function openingPrices() {
     }
 }
 
+// Function to connect to finnhub's websocket and actions to take
+async function startWebsocket() {
+    const socket = new WebSocket(
+        `wss://ws.finnhub.io?token=${FINNHUB_API_KEY}`,
+    );
+
+    // Handle initial opening of the websocket
+    socket.on("open", function (event) {
+        // loop through tickers list and send a subscribe request to the finnhub ws server
+        for (const ticker of tickers) {
+            socket.send(JSON.stringify({ type: "subscribe", symbol: ticker }));
+        }
+    });
+
+    // Handle websockt messages
+    socket.on("message", async function (data) {
+        try {
+            // Parse the data inside the message received
+            const payload = JSON.parse(data.toString());
+            // Check for ping messages and ignore
+            if (payload.type == "ping") {
+                return;
+                // console.log("ping msg");
+            }
+
+            // Check if message is real trade from market and process
+            if (payload.type == "trade" && payload.data) {
+                for (const item of payload.data) {
+                    const ticker = item.s;
+                    const latestPrice = item.p;
+
+                    // Send info to Redis cloud server
+                    const redisPriceKey = `stock:${ticker}:price`;
+                    await redisClient.set(redisPriceKey, lastPrice.toString());
+                    console.log(
+                        `Last price update ---> ${ticker}: $ ${latestPrice}`,
+                    );
+                }
+            }
+        } catch (error) {
+            console.error("Error parsing Websocket message: ", error.message);
+        }
+    });
+
+    // Handle errors from websocket
+    socket.on("error", function (error) {
+        console.error(`Websocket error received: `, error.message);
+    });
+
+    // Handle remote closure of websocker
+    socket.on("close", function () {
+        console.warn(
+            "Websocket disconnected. Will attempt reconnect in 5 seconds",
+        );
+        setTimeout(startWebsocket, 5000);
+    });
+}
+
 async function startApp() {
     // Connect to the redis service
     await redisClient.connect();
@@ -68,6 +133,8 @@ async function startApp() {
 
     // poll market prices for the tickers in the list
     await openingPrices();
+    // run the websocket function
+    await startWebsocket();
 }
 
 startApp();
