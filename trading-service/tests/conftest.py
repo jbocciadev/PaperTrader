@@ -1,23 +1,21 @@
 import pytest
-from app.models import Base, User
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
-def test_create_user_model(db_session):
-    """Check that a user record can be created in the database"""
-
-    # Bind the db metadata
-    Base.metadata.create_all(bind=db_session.get_bind())
-
-    # Initialize User record with test funds
-    new_user = User(username="trader_juan", cash_balance=10000.0)
-
-    # Add and save record into database
-    db.session.add(new_user)
-    db.sessio.commit()
-
-    # Query db to confirm user record has been successfully stored
-    stored_user = db.session.query(User).filter_by(username="trader_juan").first()
-
-    # Assertions
-    assert stored_user is not None
-    assert stored_user.id is not None # Auto-gen. primary key
-    assert stored_user.cash_balance == 10000.0
+# Create a temporary database for test runs
+@pytest.fixture(scope="function")
+def db_session():
+    """Provides a clean, isolated in-memory database session for a unit test."""
+    
+    # Cerate the virtual memory engine
+    engine = create_engine("sqlite:///:memory:")
+    
+    # Create a session factory
+    TestingSessionLocal = sessionmaker(bind=engine)
+    
+    
+    session = TestingSessionLocal()
+    try:
+        yield session  # Pass the active database connection to the test function
+    finally:
+        session.close()  # Remove the database when session os over
