@@ -8,6 +8,7 @@ def db_session():
     """Provides a clean, isolated in-memory database session for a unit test."""
     
     # Cerate the virtual memory engine with a SQLite database for testing
+    # The SQLite database exists in RAM only, there is no physical db.sqlite file
     engine = create_engine("sqlite:///:memory:")
     
     # Create a session factory

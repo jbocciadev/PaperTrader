@@ -1,10 +1,19 @@
 import os
+# from dotenv import load_application_env
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+# Load environment variables
+load_dotenv(dotenv_path="../.env")
 
 # Get PostgreSQL database details from environment variables
 # Fallback to a local default i not configured
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/papertrader")
+
+# Check that a db was loaded, otherwise raise an error
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL env var missing or not loaded.")
 
 # Initialize the engine connection
 engine = create_engine(DATABASE_URL)

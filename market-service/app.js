@@ -5,7 +5,7 @@ import WebSocket from "ws";
 
 // Configure environment variables
 dotenv.config({
-    path: ".env",
+    path: "../.env",
 });
 
 // Configure Redis cloud database
