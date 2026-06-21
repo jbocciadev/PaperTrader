@@ -1,17 +1,17 @@
 syntax = "proto3";
 
-package trading_engine
+package trading_engine;
 
-Service TradingService { 
+service TradingService { 
     rpc ExecuteTrade (TradeRequest) returns (TradeResponse);
-    rpc GetPortfolio (PortfolioRequest) returns (PortfolioRespoonse);
+    rpc GetPortfolio (PortfolioRequest) returns (PortfolioResponse);
 }
 
 // Restrict trade actions to pre-defined list
 
 enum TradeType {
-    BUY = 1;
-    SELL = 2;
+    BUY = 0;
+    SELL = 1;
 }
 
 // Trade request sent by web server
@@ -34,7 +34,7 @@ message PortfolioRequest {
     string user_id = 1;
 }
 
-message PortfolioRespoonse {
+message PortfolioResponse {
     string user_id = 1;
     double cash_balance = 2;
     string portfolio_summary = 3;
