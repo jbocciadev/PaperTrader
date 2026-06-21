@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package trading_engine;
+
+service TradingService { 
+    rpc ExecuteTrade (TradeRequest) returns (TradeResponse);
+    rpc GetPortfolio (PortfolioRequest) returns (PortfolioResponse);
+}
+
+// Restrict trade actions to pre-defined list
+
+enum TradeType {
+    BUY = 0;
+    SELL = 1;
+}
+
+// Trade request sent by web server
+message TradeRequest {
+    string user_id = 1;
+    string ticker = 2;
+    int32 quantity = 3; // Limiting purchases to whole shares to avoid fractional transactions
+    TradeType trade_type = 4;
+}
+
+// Receipt responsereturned by the trading engine
+message TradeResponse {
+    bool success = 1;
+    string message = 2; // Confirmation/error message
+    string transaction_id = 3;  //  Empty for failed transactions
+    double execution_price = 4; //  Price fetched from Redis at time of execution 
+}
+
+message PortfolioRequest {
+    string user_id = 1;
+}
+
+message PortfolioResponse {
+    string user_id = 1;
+    double cash_balance = 2;
+    string portfolio_summary = 3;
+}
