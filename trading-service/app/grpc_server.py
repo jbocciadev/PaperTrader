@@ -4,6 +4,7 @@
 import grpc
 from app import engine_pb2_grpc
 from app import engine_pb2
+from app import engine
 
 class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
     """
@@ -11,18 +12,53 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
     Inherits from the compiled gRPC base class
     """
 
+    def __init__(self, redis_client):
+        self.redis_client = redis_client
+
     def ExecuteTrade(self, request, context):
         """ 
         Receives a TradeRequest message
         and executes the transaction requested.
         """
-        # Temporary hardcoded response for test purposes
-        return engine_pb2.TradeResponse(
-            success=True,
-            message="Trade processed successfully (stub)",
-            transaction_id="tx_stub_999",
-            execution_price=150.0
-        )
+
+        if request.trade_type == engine_pb2.BUY:
+            try:
+                # Mock funds for testing, will be queried from DB
+                user_cash = 10000.00
+
+                # Execute price check and calculation
+                new_balance, total_cost = engine.execute_buy_transaction(
+                    redis_client=self.redis_client,
+                    current_cash=user_cash,
+                    shares=request.quantity,
+                    ticker=request.ticker
+                )
+
+                # Get cached price
+                cached_price = engine.get_cached_price(self.redis_client, request.ticker)
+
+                return engine_pb2.TradeResponse(
+                    success=True,
+                    message=f"Successfully purchased {request.quantity} shares of {request.ticker}.",
+                    transaction_id="tx_generated_123",
+                    execution_price=cached_price
+                )
+            except ValueError as error:
+                # Catch insufficient funds/price unavailable errors
+                return engine_pb2.TradeResponse(
+                    success=False,
+                    message=str(error),
+                    transaction_id="",
+                    execution_price=0.0
+                )
+            
+            # Fallback return statement
+            return engine_pb2.TradeResponse(
+                success=False,
+                message="Unsupported transaction type specified.",
+                transaction_id="",
+                execution_price=0.0
+            )
     
     def GetPortfolio(self, request, context):
         """

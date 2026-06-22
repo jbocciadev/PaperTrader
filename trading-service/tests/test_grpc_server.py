@@ -9,13 +9,22 @@ from app import engine_pb2_grpc
 from app.grpc_server import TradingServiceServicer
 
 
+class MockRedis:
+    def get(self, key):
+        # Simulates a cached price for the ticker passed
+        return "150.0"
+
 # https://docs.pytest.org/en/6.2.x/fixture.html
 @pytest.fixture
 def grpc_channel():
     # Source descriptor from engine_pb2
     service_description = engine_pb2.DESCRIPTOR.services_by_name['TradingService']
+
+    mock_redis = MockRedis()
     
-    descriptors_to_servicers = {service_description: TradingServiceServicer()}
+    descriptors_to_servicers = {
+        service_description: TradingServiceServicer(redis_client=mock_redis)
+        }
 
     # Run mock server and return it
     test_server = grpc_testing.server_from_dictionary(
