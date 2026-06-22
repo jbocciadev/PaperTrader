@@ -34,14 +34,14 @@ def test_successful_grpc_buy(grpc_channel):
     )
 
     # retrieve descriptor from engine
-    method_descriptor = engine_pb2.DESCRIPTOR.services_by_name['TradingService']
+    method_descriptor = engine_pb2.DESCRIPTOR.services_by_name['TradingService'].methods[0]
 
     # Send request to mock server
     rpc = grpc_channel.invoke_unary_unary(
         method_descriptor,
         invocation_metadata=None,
         request=request,
-        deadline=None,
+        timeout=None
     )
 
     # Unpack the response tuple in variables for later use
