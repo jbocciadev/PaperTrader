@@ -22,7 +22,8 @@ def get_cached_price(redis_client, ticker):
 #  
 def execute_buy_transaction(redis_client, current_cash, shares, ticker):
     cached_price = get_cached_price(redis_client, ticker)
-    return calculate_buy_order(current_cash, shares, cached_price)
+    new_balance, total_cost = calculate_buy_order(current_cash, shares, cached_price)
+    return new_balance, total_cost, cached_price
 
 # Calculates outcome of a buy order
 def calculate_sell_order(current_cash, held_shares, shares_to_sell, execution_price):
@@ -35,4 +36,5 @@ def calculate_sell_order(current_cash, held_shares, shares_to_sell, execution_pr
 
 def execute_sell_order(redis_client, current_cash, held_shares, shares_to_sell, ticker):
     cached_price = get_cached_price(redis_client, ticker)
-    return calculate_sell_order(current_cash, held_shares, shares_to_sell, cached_price)
+    new_balance, total_proceeds = calculate_sell_order(current_cash, held_shares, shares_to_sell, cached_price)
+    return new_balance, total_proceeds, cached_price

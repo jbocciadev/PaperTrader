@@ -6,6 +6,7 @@ from app import engine_pb2_grpc
 from app import engine_pb2
 from app import engine
 from app.models import User, Transaction
+from sqlalchemy import func
 
 class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
     """
@@ -52,15 +53,12 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
         if request.trade_type == engine_pb2.BUY:
             try:
                 # Execute price check and calculation
-                new_balance, total_cost = engine.execute_buy_transaction(
+                new_balance, total_cost, cached_price = engine.execute_buy_transaction(
                     redis_client=self.redis_client,
                     current_cash=user_cash,
                     shares=request.quantity,
                     ticker=request.ticker
                 )
-
-                # Get cached price
-                cached_price = engine.get_cached_price(self.redis_client, request.ticker)
 
                 # Update db if order succeeds
                 if self.db_session is not None:
@@ -78,30 +76,65 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                 # Catch insufficient funds/price unavailable errors
                 if self.db_session is not None:
                     self.db_session.rollback() # Undo any changes in case of error
-                    
+
                 return engine_pb2.TradeResponse(
                     success=False,
                     message=str(error),
                     transaction_id="",
                     execution_price=0.0
                 )
-            
                     
         # Implement Sell transaction type
         elif request.trade_type == engine_pb2.SELL:
             try:
-                # Mock values
-                user_cash = 10000.0
-                user_held_shares = 50
+                # Retrieve user record from db
+                if self.db_session is not None:
+                    user_record = self.db_session.query(User).filter(User.id == request.user_id).first()
+                    # Return failure if user not found
+                    if user_record is None:
+                        return engine_pb2.TradeResponse(
+                        success=False,
+                        message="Aborted, user not found.",
+                        transaction_id="",
+                        execution_price=0.0
+                    )
+
+                    user_cash = user_record.cash_balance
+
+                    # Calculate current total of shares owned by the user 
+                    # by adding BUY transactions and subtracting SELL transactions
+                    bought_shares = self.db_session.query(func.sum(Transaction.shares)).filter(
+                        Transaction.user_id == request.user_id,
+                        Transaction.ticker == request.ticker,
+                        Transaction.transaction_type == "BUY"
+                    ).scalar() or 0
+
+                    sold_shares = self.db_session.query(func.sum(Transaction.shares)).filter(
+                        Transaction.user_id == request.user_id,
+                        Transaction.ticker == request.ticker,
+                        Transaction.transaction_type == "SELL"
+                    ).scalar() or 0
+
+                    user_held_shares = bought_shares - sold_shares
+                
+                else:
+                    # Fallback values for testing scenarios
+                    user_cash = 10000.0
+                    user_held_shares = 50
 
                 # Execute transaction
-                new_balance, total_proceeds = engine.execute_sell_order(
+                new_balance, total_proceeds, cached_price = engine.execute_sell_order(
                     redis_client=self.redis_client,
                     current_cash=user_cash,
                     held_shares=user_held_shares,
                     shares_to_sell=request.quantit,
                     ticker=request.ticker
                 )
+
+                # Store transaction receipt in db
+                if self.db_session is not None:
+                    user_record.cash_balance = new_balance
+                    self.db_session.commit()
             
             except ValueError as error:
                 # Catch errors for trying to sell too many shares

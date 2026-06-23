@@ -76,7 +76,7 @@ def test_execute_buy_transaction():
     ticker = "AAPL"
 
     # Call function to e tested
-    new_balance, total_cost = execute_buy_transaction(mock_redis, current_cash, shares, ticker)
+    new_balance, total_cost, cached_price = execute_buy_transaction(mock_redis, current_cash, shares, ticker)
 
     # Assertions
     assert total_cost == 500.0
