@@ -1,3 +1,4 @@
 pytest==9.0.3
 psycopg2==2.9.12
 SQLAlchemy==2.0.50
+grpcio-testing==1.81.1

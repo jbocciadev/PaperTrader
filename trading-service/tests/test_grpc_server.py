@@ -62,3 +62,31 @@ def test_successful_grpc_buy(grpc_channel):
     assert "successfully" in response.message.lower()
     assert response.execution_price > 0.0
     assert len(response.transaction_id) > 0
+
+def test_negative_shares_quantity(grpc_channel):
+    # Invalid request with negative shares ammount
+    request = engine_pb2.TradeRequest(
+        user_id="user_test_123",
+        ticker="AAPL",
+        quantity=-5, # Invalid value
+        trade_type=engine_pb2.BUY
+    )
+    
+    # retrieve descriptor from engine
+    method_descriptor = engine_pb2.DESCRIPTOR.services_by_name['TradingService'].methods[0]
+
+    # Send request upstream
+    rpc = grpc_channel.invoke_unary_unary(
+        method_descriptor,
+        invocation_metadata=None,
+        request=request,
+        timeout=None
+    )
+
+     # Unpack the response tuple in variables for later use
+    response, _, code, _ = rpc.termination()
+
+    # Assertions to check if call returned a success message
+    assert code == grpc.StatusCode.OK
+    assert response.success is False
+    assert len(response.message) > 0

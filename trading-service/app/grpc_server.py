@@ -20,7 +20,16 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
         Receives a TradeRequest message
         and executes the transaction requested.
         """
+        # Check against invalid number of shares
+        if request.quantity <= 0:
+            return engine_pb2.TradeResponse(
+                success=False,
+                message="Quanitty must be a possitive whole integer, greater than zero",
+                transaction_id="",
+                execution_price=0.0
+            )
 
+        # Implement BUY transaction type
         if request.trade_type == engine_pb2.BUY:
             try:
                 # Mock funds for testing, will be queried from DB
@@ -43,6 +52,7 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                     transaction_id="tx_generated_123",
                     execution_price=cached_price
                 )
+            
             except ValueError as error:
                 # Catch insufficient funds/price unavailable errors
                 return engine_pb2.TradeResponse(
@@ -52,13 +62,40 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                     execution_price=0.0
                 )
             
-            # Fallback return statement
+                    
+        # Implement Sell transaction type
+        elif request.trade_type == engine_pb2.SELL:
+            try:
+                # Mock values
+                user_cash = 10000.0
+                user_held_shares = 50
+
+                # Execute transaction
+                new_balance, total_proceeds = engine.execute_sell_order(
+                    redis_client=self.redis_client,
+                    current_cash=user_cash,
+                    held_shares=user_held_shares,
+                    shares_to_sell=request.quantit,
+                    ticker=request.ticker
+                )
+            
+            except ValueError as error:
+                # Catch errors for trying to sell too many shares
+                return engine_pb2.TradeResponse(
+                    success=False,
+                    message=str(error),
+                    transaction_id="",
+                    execution_price=0.0
+                )
+
+        # Fallback return statement
             return engine_pb2.TradeResponse(
                 success=False,
                 message="Unsupported transaction type specified.",
                 transaction_id="",
                 execution_price=0.0
             )
+
     
     def GetPortfolio(self, request, context):
         """
