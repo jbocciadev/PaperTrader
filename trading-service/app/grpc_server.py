@@ -5,6 +5,7 @@ import grpc
 from app import engine_pb2_grpc
 from app import engine_pb2
 from app import engine
+from app.models import User, Transaction
 
 class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
     """
@@ -12,8 +13,9 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
     Inherits from the compiled gRPC base class
     """
 
-    def __init__(self, redis_client):
+    def __init__(self, redis_client, db_session):
         self.redis_client = redis_client
+        self.db_session = db_session
 
     def ExecuteTrade(self, request, context):
         """ 
@@ -28,13 +30,27 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                 transaction_id="",
                 execution_price=0.0
             )
+        # Check for active db session, or None for test purposes
+        if self.db_session is not None:
+            # Query db for user record
+            user_record = self.db_session.query(User).filter(User.id == request.user_id).first()
+            # Validate user
+            if user_record is None:
+                return engine_pb2.TradeResponse(
+                    success=False,
+                    message="Aborted. User not found in database.",
+                    transaction_id="",
+                    execution_price=0.0
+                )
+            
+            user_cash = user_record.cash_balance
+        else:
+            # Mock funds for testing, will be queried from DB
+            user_cash = 10000.00
 
         # Implement BUY transaction type
         if request.trade_type == engine_pb2.BUY:
             try:
-                # Mock funds for testing, will be queried from DB
-                user_cash = 10000.00
-
                 # Execute price check and calculation
                 new_balance, total_cost = engine.execute_buy_transaction(
                     redis_client=self.redis_client,
@@ -46,6 +62,11 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                 # Get cached price
                 cached_price = engine.get_cached_price(self.redis_client, request.ticker)
 
+                # Update db if order succeeds
+                if self.db_session is not None:
+                    user_record.cash_balance = new_balance
+                    self.db_session.commit()
+
                 return engine_pb2.TradeResponse(
                     success=True,
                     message=f"Successfully purchased {request.quantity} shares of {request.ticker}.",
@@ -55,6 +76,9 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
             
             except ValueError as error:
                 # Catch insufficient funds/price unavailable errors
+                if self.db_session is not None:
+                    self.db_session.rollback() # Undo any changes in case of error
+                    
                 return engine_pb2.TradeResponse(
                     success=False,
                     message=str(error),

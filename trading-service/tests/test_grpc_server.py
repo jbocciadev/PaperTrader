@@ -23,7 +23,7 @@ def grpc_channel():
     mock_redis = MockRedis()
     
     descriptors_to_servicers = {
-        service_description: TradingServiceServicer(redis_client=mock_redis)
+        service_description: TradingServiceServicer(redis_client=mock_redis, db_session=None)
         }
 
     # Run mock server and return it
@@ -36,7 +36,7 @@ def grpc_channel():
 def test_successful_grpc_buy(grpc_channel):
     # Build strictly-typed message as per .proto file definitions
     request = engine_pb2.TradeRequest(
-        user_id="user_test_123",
+        user_id=123,
         ticker="AAPL",
         quantity=10,
         trade_type=engine_pb2.BUY
@@ -66,7 +66,7 @@ def test_successful_grpc_buy(grpc_channel):
 def test_negative_shares_quantity(grpc_channel):
     # Invalid request with negative shares ammount
     request = engine_pb2.TradeRequest(
-        user_id="user_test_123",
+        user_id=123,
         ticker="AAPL",
         quantity=-5, # Invalid value
         trade_type=engine_pb2.BUY
