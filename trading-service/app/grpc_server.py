@@ -60,10 +60,23 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                     ticker=request.ticker
                 )
 
-                # Update db if order succeeds
+                # Update db for user if order succeeds
                 if self.db_session is not None:
                     user_record.cash_balance = new_balance
+
+                    # Store transaction in db
+                    new_transaction = Transaction(
+                        user_id=request.user_id,
+                        shares=request.quantity,
+                        ticker=request.ticker,
+                        price=cached_price,
+                        transaction_type="BUY"
+                    )
+                    self.db_session.add(new_transaction)
+
+                    # Commit both updates to the db
                     self.db_session.commit()
+
 
                 return engine_pb2.TradeResponse(
                     success=True,
@@ -131,10 +144,30 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                     ticker=request.ticker
                 )
 
-                # Store transaction receipt in db
+                # Update db for user record if transaction succeeds
                 if self.db_session is not None:
                     user_record.cash_balance = new_balance
+
+                    # Store transaction in db
+                    new_transaction = Transaction(
+                        user_id=request.user_id,
+                        shares=request.quantity,
+                        ticker=request.ticker,
+                        price=cached_price,
+                        transaction_type="SELL"
+                    )
+                    self.db_session.add(new_transaction)
+
+                    # Commit both additions to the database
                     self.db_session.commit()
+
+                return engine_pb2.TradeResponse(
+                    success=True,
+                    message=f"Successfully sold {request.quantity} shares of {request.ticker}.",
+                    transaction_id="tx_generated_sell",  # Placeholder until UUID or auto-inc tracking is hooked up
+                    execution_price=cached_price
+                )
+
             
             except ValueError as error:
                 # Catch errors for trying to sell too many shares
