@@ -1,0 +1,19 @@
+{
+    "folders": [
+        {
+            "path": ".",
+        },
+        {
+            "name": "Trading Service Core",
+            "path": "trading-service",
+        },
+        {
+            "name": "FastAPI Web Server",
+            "path": "web-server",
+        },
+    ],
+    "settings": {
+        "python.testing.pytestEnabled": true,
+        "python.testing.unittestEnabled": false,
+    },
+}
