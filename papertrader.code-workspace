@@ -4,6 +4,10 @@
             "path": ".",
         },
         {
+            "name": "Market Data Service (JS)",
+            "path": "market-service",
+        },
+        {
             "name": "Trading Service Core",
             "path": "trading-service",
         },
