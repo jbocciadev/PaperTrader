@@ -1,12 +1,20 @@
+import os
+import asyncio
 import grpc
+
+
 # gRPC stubs
 import engine_pb2
 import engine_pb2_grpc
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+from upstash_redis import Redis
 
-# Placeholder for grpc client reference
+
+# gRPC client object
 grpc_client = {}
 
 @asynccontextmanager
@@ -50,7 +58,6 @@ def read_root():
         "grpc-bridge": "initialized" if "stub" in grpc_client else "offline"
     }
 
-from pydantic import BaseModel, Field
 
 # Define the model against which data will be validated
 # Reference: https://fastapi.tiangolo.com/#requirements
@@ -91,3 +98,46 @@ def handle_trade_route(payload: TradeRequestModel):
         }
     except Exception as error:
         return {"success": False, "message": f"Could not connect to the engine: {str(error)}"}
+
+
+# Wire-up the Redis server connection
+# Reference: https://upstash.com/docs/redis/tutorials/pythonapi
+# Load credentials from environment file
+load_dotenv(dotenv_path="../.env")
+
+redis_url = os.getenv("REDIS_URL")
+redis_token = os.getenv("REDIS_TOKEN")
+
+# Start Redis client from imported class
+redis_client = Redis(url=redis_url, token=redis_token)
+
+
+# Reference: https://realpython.com/async-io-python/
+
+@app.websocket("/ws/prices/{ticker}")
+async def websocket_price_stream(websocket: WebSocket, ticker: str):
+    """
+    Websocket endpoint for Redis cloud server to stream updates to the user browser.
+    """
+    await websocket.accept()
+    print(f"Client connected to real-time stream for ticker: {ticker.upper()}")
+
+    try:
+        # infinite loop to stream updates while the connection is open
+        while True:
+            # get the latest price
+            cache_key = f"stock:{ticker.upper()}:price"
+            latest_price = redis_client.get(cache_key)
+
+            if latest_price is not None:
+                # Ref: https://fastapi.tiangolo.com/reference/websockets/#fastapi.WebSocket.send_json
+                await websocket.send_json({
+                    "ticker": ticker.upper(),
+                    "price": str(latest_price),
+                    "timestamp": "Live"
+                })
+                # 1-second interval to prevent overwhelming Redis server
+                await asyncio.sleep(1)
+    except WebSocketDisconnect:
+        # Cach error when the websocket is disconnected.
+        print(f"Client disconnected cleanly from price stream: {ticker.upper()}")
