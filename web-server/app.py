@@ -1,3 +1,4 @@
+import os
 import grpc
 # gRPC stubs
 import engine_pb2
@@ -5,6 +6,10 @@ import engine_pb2_grpc
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+from upstash_redis import Redis
+
 
 # Placeholder for grpc client reference
 grpc_client = {}
@@ -50,7 +55,6 @@ def read_root():
         "grpc-bridge": "initialized" if "stub" in grpc_client else "offline"
     }
 
-from pydantic import BaseModel, Field
 
 # Define the model against which data will be validated
 # Reference: https://fastapi.tiangolo.com/#requirements
@@ -91,3 +95,13 @@ def handle_trade_route(payload: TradeRequestModel):
         }
     except Exception as error:
         return {"success": False, "message": f"Could not connect to the engine: {str(error)}"}
+
+# Wire-up the Redis server connection
+# Load credentials from environment file
+load_dotenv(dotenv_path="../.env")
+
+redis_url = os.getenv("REDIS_URL")
+redis_token = os.getenv("REDIS_TOKEN")
+
+# Start Redis client from imported class
+redis_client = Redis(url=redis_url, token=redis_token)
