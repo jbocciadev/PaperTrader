@@ -9,6 +9,7 @@ class User(Base):
     # Set up of users table
     id = Column(Integer, primary_key=True, index=True, autoincrement=True) # Set up pk
     username = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
     cash_balance = Column(Float, default=10000.0, nullable=False)
 
 class Transaction(Base):

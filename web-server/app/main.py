@@ -7,13 +7,20 @@ import grpc
 import engine_pb2
 import engine_pb2_grpc
 
+# Hashing library for security purposes
+import hashlib
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends, Form
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from upstash_redis import Redis
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
+
+from database import get_db
+from models import User
 
 
 # gRPC client object
@@ -50,7 +57,7 @@ app = FastAPI(
 # Reference templates folder to be served
 templates=Jinja2Templates(directory="templates")
 
-# Define home route
+
 # @app.get("/")
 # def read_root():
 #     """
@@ -63,6 +70,7 @@ templates=Jinja2Templates(directory="templates")
 #         "grpc-bridge": "initialized" if "stub" in grpc_client else "offline"
 #     }
     
+# Define home route
 @app.get("/")
 def home(request: Request):
     """
@@ -72,6 +80,48 @@ def home(request: Request):
         request=request,
         name="base.html"
     )
+
+@app.get("/register")
+def show_register_page(request: Request):
+    """
+    Serves the visual signup form view to the client browser.
+    """
+    return templates.TemplateResponse(request=request, name="register.html")
+
+@app.post("/register")
+def process_registration(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Parses the form submitted within constraints and saves data in PostgreSQL DB
+    """
+    # Check if username is already taken
+    existing_user = db.query(User).filter(User.username == username).first()
+    
+    if existing_user is not None:
+        # If the username exists, return error message to the browser
+        return {"error": "Username already exists. Please choose a different name."}
+    
+    # Use hash to encrypt the passord
+    hashed_pwd = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        
+    # Create the new user record profile object (starting with $10,000 cash)
+    new_user = User(
+        username=username,
+        password_hash=hashed_pwd,  # Storing as a plain text string token for simplicity
+        cash_balance=10000.00
+    )
+    
+    # Commit the changes to the database tables
+    db.add(new_user)
+    db.commit()
+    
+    # Redirect the browser to the login interface
+    return RedirectResponse(url="/login", status_code=303)
+
 
 
 # Define the model against which data will be validated
