@@ -8,10 +8,11 @@ import engine_pb2
 import engine_pb2_grpc
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from upstash_redis import Redis
+from fastapi.templating import Jinja2Templates
 
 
 # gRPC client object
@@ -45,18 +46,31 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Reference templates folder to be served
+templates=Jinja2Templates(directory="templates")
+
 # Define home route
+# @app.get("/")
+# def read_root():
+#     """
+#     Initial sample to test web server is operationsl.
+#     """
+#     return {
+#         "status": "online",
+#         "service": "web-gateway",
+#         # "message": "Welcome to PaperTrader."
+#         "grpc-bridge": "initialized" if "stub" in grpc_client else "offline"
+#     }
+    
 @app.get("/")
-def read_root():
+def home(request: Request):
     """
-    Initial sample to test web server is operationsl.
+    Route that serves the main landing page
     """
-    return {
-        "status": "online",
-        "service": "web-gateway",
-        # "message": "Welcome to PaperTrader."
-        "grpc-bridge": "initialized" if "stub" in grpc_client else "offline"
-    }
+    return templates.TemplateResponse(
+        request=request,
+        name="base.html"
+    )
 
 
 # Define the model against which data will be validated
