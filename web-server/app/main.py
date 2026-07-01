@@ -241,6 +241,19 @@ def process_login(
     return response
 
 # Routes for the logout workflow ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
+@app.get("/logout")
+def process_logout():
+    """
+    Clears the cookie from the browser and redirtects to login
+    """
+    
+    response = RedirectResponse(url="/login", status_code=303)    
+    # Delete the cookie from the session in the response to be sent
+    response.delete_cookie(key="access_token", path="/")
+    
+    print("User session terminated cleanly. Cookie deleted.")
+    return response
+
 
 # Routes for the Dashboard ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
 @app.get("/dashboard")
