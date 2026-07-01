@@ -11,7 +11,7 @@ import engine_pb2_grpc
 import hashlib
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends, Form
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends, Form, Cookie
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from upstash_redis import Redis
@@ -26,7 +26,7 @@ from models import User
 load_dotenv(dotenv_path="../.env")
 
 JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 # gRPC client object
 grpc_client = {}
@@ -101,30 +101,51 @@ async def websocket_price_stream(websocket: WebSocket, ticker: str):
         print(f"Client disconnected cleanly from price stream: {ticker.upper()}")
 
 
-# Web server routes -----------------------
+# Web server routes ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
 
 # Reference templates folder to be served
 templates=Jinja2Templates(directory="templates")
 
 # Define home route
 @app.get("/")
-def home(request: Request):
+def home(
+    request: Request,
+    access_token: str = Cookie(None),
+    db: Session = Depends(get_db)
+    ):
     # Reference: https://fastapi.tiangolo.com/advanced/templates/
     """
-    Route that serves the main landing page
+    Route that serves the main landing page. If a user is logged in, it will rende the dashboard
     """
+
+    current_user = None
+
+    # Try to validate token credentials
+    if access_token:
+        try:
+            decoded_payload = jwt.decode(access_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            user_id = decoded_payload.get("user_id")
+            current_user = db.query(User).filter(User.id == user_id).first()
+        except jwt.PyJWTError:
+            current_user = None
+
     return templates.TemplateResponse(
         request=request,
-        name="base.html"
+        name="base.html",
+        context={"user": current_user}
     )
 
-# Routes for the register workflow
+# Routes for the register workflow ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
 @app.get("/register")
 def show_register_page(request: Request):
     """
     Serves the visual signup form view to the client browser.
     """
-    return templates.TemplateResponse(request=request, name="register.html")
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
+        context={"user": None}
+        )
 
 @app.post("/register")
 def process_registration(
@@ -160,15 +181,17 @@ def process_registration(
     # Redirect the browser to the login interface
     return RedirectResponse(url="/login", status_code=303)
 
-
-# Routes for the login workflow
+# Routes for the login workflow ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
 @app.get("/login")
 def show_login_page(request: Request):
     """
     Serves the login page to the user's browser
     """
-
-    return templates.TemplateResponse(request=request, name="login.html")
+    return templates.TemplateResponse(
+        request=request, 
+        name="login.html",
+        context={"user":None}
+        )
 
 @app.post("/login")
 def process_login(
@@ -209,13 +232,55 @@ def process_login(
     # Reference: https://fastapi.tiangolo.com/reference/responses/#fastapi.responses.RedirectResponse
     response = RedirectResponse(url="/dashboard", status_code=303)
     response.set_cookie(
-        key="access_otken",
+        key="access_token",
         value=generated_token,
-        httponly=True
+        httponly=True,
+        path="/"
     )
     print(f"User session successfully initiated for usert ID: {user_record.id}")
     return response
 
+# Routes for the logout workflow ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
+
+# Routes for the Dashboard ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
+@app.get("/dashboard")
+def show_dashboard_page(
+    request: Request,
+    access_token: str = Cookie(None),
+    db: Session = Depends(get_db)
+):
+
+    """
+    Validates the session token via cookies and presents the user's dashboard
+    """
+    # If cookie is missing, redirect to Login
+    if not access_token:
+        print("Dashboard access not authorized: token is missing.")
+        return RedirectResponse(url="/login", status_code=303)
+    
+    try:
+        # Decode the token sent by the browser
+        decoded_payload = jwt.decode(access_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = decoded_payload.get("user_id")
+
+        # Retrieve account details from db
+        current_user = db.query(User).filter(User.id == user_id).first()
+
+        # If the token is for an invalid user ID (expired/deleted), redirect the user to login
+        if current_user is None:
+            return RedirectResponse(url="/login", status_code=303)
+        
+        # If the token is good, render the dashboard, passing the user info to the jinja template
+        return templates.TemplateResponse(
+            request=request,
+            name="dashboard.html",
+            context={"user": current_user}
+        )
+    
+    except jwt.PyJWTError:
+        # Cath corrupted tokens and redirect to login page
+        print("Dashboard access not authorized: token is invalid/corrupted.")
+        return RedirectResponse(url="/login", status_code=303)
 
 
 # Define the model against which data will be validated

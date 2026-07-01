@@ -17,13 +17,33 @@
         <!-- Boilerplate navbar -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
             <div class="container">
+                <!--
+                {% if user %}
+                <span class="navbar-text text-light me-3"
+                    >Welcome, <strong>{{ user.username }}</strong></span
+                >
+                
+                {% endif %} -->
+
                 <a class="navbar-brand" href="/">📈 Paper Trader</a>
                 <div class="navbar-nav ms-auto">
+                    {% if user %}
                     <a class="nav-link text-white" href="/dashboard"
                         >Dashboard</a
                     >
+                    <a class="nav-link text-danger fw-bold" href="/logout"
+                        >Logout</a
+                    >
+                    {% else %}
                     <a class="nav-link text-white" href="/login">Login</a>
                     <a class="nav-link text-white" href="/register">Register</a>
+                    {% endif %}
+
+                    <!-- <a class="nav-link text-white" href="/dashboard"
+                        >Dashboard</a
+                    >
+                    <a class="nav-link text-white" href="/login">Login</a>
+                    <a class="nav-link text-white" href="/register">Register</a> -->
                 </div>
             </div>
         </nav>
