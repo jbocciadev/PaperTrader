@@ -1,0 +1,60 @@
+{% extends "base.html" %} {% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm mt-5">
+            <div class="card-header bg-primary text-white text-center">
+                <h4 class="mb-0">Login to your account</h4>
+            </div>
+            <div class="card-body p-4">
+                <!-- Simple POST Form Routing back to our backend signup route -->
+                <form action="/login" method="POST">
+                    <!-- Username Input String Box Element -->
+                    <div class="mb-3">
+                        <label for="username" class="form-label"
+                            >Username</label
+                        >
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="username"
+                            name="username"
+                            placeholder="Choose a username"
+                            required
+                        />
+                    </div>
+
+                    <!-- Password Input String Box Element -->
+                    <div class="mb-3">
+                        <label for="password" class="form-label"
+                            >Password</label
+                        >
+                        <input
+                            type="password"
+                            class="form-control"
+                            id="password"
+                            name="password"
+                            placeholder="Create a password"
+                            required
+                        />
+                    </div>
+
+                    <!-- Form Submission Control Button Element -->
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            Log In
+                        </button>
+                    </div>
+                </form>
+
+                <div class="text-center mt-3">
+                    <small class="text-muted"
+                        >Don't have an account yet?
+                        <a href="/register">Register here</a></small
+                    >
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

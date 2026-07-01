@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 # Load environment variables
-load_dotenv(dotenv_path="../.env")
+load_dotenv(dotenv_path="../../.env")
 
 # Get PostgreSQL database details from environment variables
 # Fallback to a local default i not configured
@@ -23,10 +23,9 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():
     """Generate and return (yield) database session on request"""
+    # Reference: https://fastapi.tiangolo.com/tutorial/dependencies/dependencies-with-yield/
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-        

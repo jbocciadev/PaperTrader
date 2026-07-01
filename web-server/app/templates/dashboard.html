@@ -1,0 +1,114 @@
+{% extends "base.html" %} {% block content %}
+<div class="row">
+    <!-- LEFT PANEL: Portfolio Summary & Execution Form -->
+    <div class="col-md-5">
+        <!-- Cash Balance Display Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body bg-dark text-white text-center rounded-top">
+                <h6 class="text-uppercase text-muted small mb-1">
+                    Available Capital
+                </h6>
+                <h2 class="mb-0" id="user-cash">
+                    ${{ "%.2f"|format(user.cash_balance) }}
+                </h2>
+            </div>
+            <div class="card-footer bg-white text-center">
+                <span class="text-muted"
+                    >Account Holder: <strong>{{ user.username }}</strong></span
+                >
+            </div>
+        </div>
+
+        <!-- Trading Desk Card Container -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">🚀 Order Execution Desk</h5>
+            </div>
+            <div class="card-body">
+                <form action="/trade" method="POST">
+                    <div class="mb-3">
+                        <label for="ticker" class="form-label"
+                            >Stock Symbol</label
+                        >
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="ticker"
+                            name="ticker"
+                            placeholder="e.g. AAPL"
+                            required
+                            onkeyup="this.value = this.value.toUpperCase()"
+                        />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label"
+                            >Number of Shares</label
+                        >
+                        <input
+                            type="number"
+                            class="form-control"
+                            id="quantity"
+                            name="quantity"
+                            min="1"
+                            required
+                        />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Order Action</label>
+                        <select class="form-select" name="trade_type" required>
+                            <option value="BUY">BUY Asset</option>
+                            <option value="SELL">SELL Asset</option>
+                        </select>
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            Transmit Order Request
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL: Live Ticker Feed Monitoring Station -->
+    <div class="col-md-7">
+        <div class="card shadow-sm h-100">
+            <div
+                class="card-header bg-success text-white d-flex justify-content-between align-items-center"
+            >
+                <h5 class="mb-0">📺 Live Market Ticker Streams</h5>
+                <span
+                    class="badge bg-white text-success fw-bold"
+                    id="stream-status"
+                    >Idle</span
+                >
+            </div>
+            <div
+                class="card-body bg-light text-center d-flex flex-column justify-content-center p-5"
+                id="monitor-box"
+            >
+                <div id="price-display-panel" style="display: none">
+                    <h1
+                        class="display-1 fw-bold text-success mb-2"
+                        id="live-price"
+                    >
+                        $0.00
+                    </h1>
+                    <h3 class="text-muted text-uppercase" id="live-symbol">
+                        NONE
+                    </h3>
+                </div>
+                <div id="placeholder-panel">
+                    <p class="text-muted mb-0">
+                        Type a ticker symbol in the execution desk to initialize
+                        real-time price monitoring streams.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
