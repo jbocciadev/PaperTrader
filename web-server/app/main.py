@@ -1,7 +1,7 @@
 import os
 import asyncio
 import grpc
-
+import jwt
 
 # gRPC stubs
 import engine_pb2
@@ -22,6 +22,11 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User
 
+# Load credentials from environment file
+load_dotenv(dotenv_path="../.env")
+
+JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
 
 # gRPC client object
 grpc_client = {}
@@ -54,25 +59,57 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+    
+
+# Wire-up the Redis server connection
+# Reference: https://upstash.com/docs/redis/tutorials/pythonapi
+
+redis_url = os.getenv("REDIS_URL")
+redis_token = os.getenv("REDIS_TOKEN")
+
+# Start Redis client from imported class
+redis_client = Redis(url=redis_url, token=redis_token)
+
+
+# Reference: https://realpython.com/async-io-python/
+@app.websocket("/ws/prices/{ticker}")
+async def websocket_price_stream(websocket: WebSocket, ticker: str):
+    """
+    Websocket endpoint for Redis cloud server to stream updates to the user browser.
+    """
+    await websocket.accept()
+    print(f"Client connected to real-time stream for ticker: {ticker.upper()}")
+
+    try:
+        # infinite loop to stream updates while the connection is open
+        while True:
+            # get the latest price
+            cache_key = f"stock:{ticker.upper()}:price"
+            latest_price = redis_client.get(cache_key)
+
+            if latest_price is not None:
+                # Ref: https://fastapi.tiangolo.com/reference/websockets/#fastapi.WebSocket.send_json
+                await websocket.send_json({
+                    "ticker": ticker.upper(),
+                    "price": str(latest_price),
+                    "timestamp": "Live"
+                })
+                # 1-second interval to prevent overwhelming Redis server
+                await asyncio.sleep(1)
+    except WebSocketDisconnect:
+        # Cach error when the websocket is disconnected.
+        print(f"Client disconnected cleanly from price stream: {ticker.upper()}")
+
+
+# Web server routes -----------------------
+
 # Reference templates folder to be served
 templates=Jinja2Templates(directory="templates")
 
-
-# @app.get("/")
-# def read_root():
-#     """
-#     Initial sample to test web server is operationsl.
-#     """
-#     return {
-#         "status": "online",
-#         "service": "web-gateway",
-#         # "message": "Welcome to PaperTrader."
-#         "grpc-bridge": "initialized" if "stub" in grpc_client else "offline"
-#     }
-    
 # Define home route
 @app.get("/")
 def home(request: Request):
+    # Reference: https://fastapi.tiangolo.com/advanced/templates/
     """
     Route that serves the main landing page
     """
@@ -81,6 +118,7 @@ def home(request: Request):
         name="base.html"
     )
 
+# Routes for the register workflow
 @app.get("/register")
 def show_register_page(request: Request):
     """
@@ -123,6 +161,62 @@ def process_registration(
     return RedirectResponse(url="/login", status_code=303)
 
 
+# Routes for the login workflow
+@app.get("/login")
+def show_login_page(request: Request):
+    """
+    Serves the login page to the user's browser
+    """
+
+    return templates.TemplateResponse(request=request, name="login.html")
+
+@app.post("/login")
+def process_login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Validates the submitted password against the hashed version stored in 
+    the PostgreSQL server and inserts a token for the user session
+    """
+    # Encrypt the submitted pwd to check against the one in the db
+    incoming_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+    # Query the db for an entry with both username and hashed password
+    user_record = db.query(User).filter(
+        User.username == username,
+        User.password_hash == incoming_hash
+    ).first()
+
+    # Return the same page with an error message if credentials don't match
+    if user_record is None:
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "error": "Invalid Username or password. Please try again."
+            }
+        )
+    
+    # If a matching record is found, create the token to be served
+    # Reference: https://pyjwt.readthedocs.io/en/stable/usage.html#encoding-decoding-tokens-with-hs256
+    token_payload = {"user_id": user_record.id}
+    generated_token = jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    # Effectively log the user in and rediret them to the dashboard
+    # Reference: https://fastapi.tiangolo.com/reference/responses/#fastapi.responses.RedirectResponse
+    response = RedirectResponse(url="/dashboard", status_code=303)
+    response.set_cookie(
+        key="access_otken",
+        value=generated_token,
+        httponly=True
+    )
+    print(f"User session successfully initiated for usert ID: {user_record.id}")
+    return response
+
+
 
 # Define the model against which data will be validated
 # Reference: https://fastapi.tiangolo.com/#requirements
@@ -163,46 +257,3 @@ def handle_trade_route(payload: TradeRequestModel):
         }
     except Exception as error:
         return {"success": False, "message": f"Could not connect to the engine: {str(error)}"}
-
-
-# Wire-up the Redis server connection
-# Reference: https://upstash.com/docs/redis/tutorials/pythonapi
-# Load credentials from environment file
-load_dotenv(dotenv_path="../.env")
-
-redis_url = os.getenv("REDIS_URL")
-redis_token = os.getenv("REDIS_TOKEN")
-
-# Start Redis client from imported class
-redis_client = Redis(url=redis_url, token=redis_token)
-
-
-# Reference: https://realpython.com/async-io-python/
-
-@app.websocket("/ws/prices/{ticker}")
-async def websocket_price_stream(websocket: WebSocket, ticker: str):
-    """
-    Websocket endpoint for Redis cloud server to stream updates to the user browser.
-    """
-    await websocket.accept()
-    print(f"Client connected to real-time stream for ticker: {ticker.upper()}")
-
-    try:
-        # infinite loop to stream updates while the connection is open
-        while True:
-            # get the latest price
-            cache_key = f"stock:{ticker.upper()}:price"
-            latest_price = redis_client.get(cache_key)
-
-            if latest_price is not None:
-                # Ref: https://fastapi.tiangolo.com/reference/websockets/#fastapi.WebSocket.send_json
-                await websocket.send_json({
-                    "ticker": ticker.upper(),
-                    "price": str(latest_price),
-                    "timestamp": "Live"
-                })
-                # 1-second interval to prevent overwhelming Redis server
-                await asyncio.sleep(1)
-    except WebSocketDisconnect:
-        # Cach error when the websocket is disconnected.
-        print(f"Client disconnected cleanly from price stream: {ticker.upper()}")
