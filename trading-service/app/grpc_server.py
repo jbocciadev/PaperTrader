@@ -20,7 +20,7 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
     Inherits from the compiled gRPC base class
     """
 
-    def __init__(self, redis_client, db_session):
+    def __init__(self, redis_client, db_session=None): # Default to None to allow for prod/test start
         self.redis_client = redis_client
         self.db_session = db_session
 
@@ -29,18 +29,28 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
         Receives a TradeRequest message
         and executes the transaction requested.
         """
+
+        # Check if a mock db has been passed
+        is_test_environment = self.db_session is not None 
+        if is_test_environment:
+            db = self.db_session
+        else:
+            db = SessionLocal()
+
+
         # Check against invalid number of shares
         if request.quantity <= 0:
             return engine_pb2.TradeResponse(
                 success=False,
-                message="Quanitty must be a possitive whole integer, greater than zero",
+                message="Quantity must be a possitive whole integer, greater than zero",
                 transaction_id="",
                 execution_price=0.0
             )
-        # Check for active db session, or None for test purposes
-        if self.db_session is not None:
+        
+        # If production, query DB for actual user
+        if not is_test_environment:
             # Query db for user record
-            user_record = self.db_session.query(User).filter(User.id == request.user_id).first()
+            user_record = db.query(User).filter(User.id == request.user_id).first()
             # Validate user
             if user_record is None:
                 return engine_pb2.TradeResponse(
@@ -67,7 +77,7 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                 )
 
                 # Update db for user if order succeeds
-                if self.db_session is not None:
+                if not is_test_environment:
                     user_record.cash_balance = new_balance
 
                     # Store transaction in db
@@ -78,11 +88,10 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                         price=cached_price,
                         transaction_type="BUY"
                     )
-                    self.db_session.add(new_transaction)
+                    db.add(new_transaction)
 
                     # Commit both updates to the db
-                    self.db_session.commit()
-
+                    db.commit()
 
                 return engine_pb2.TradeResponse(
                     success=True,
@@ -93,8 +102,8 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
             
             except ValueError as error:
                 # Catch insufficient funds/price unavailable errors
-                if self.db_session is not None:
-                    self.db_session.rollback() # Undo any changes in case of error
+                if not is_test_environment:
+                    db.rollback()  # Undo any changes in case of error
 
                 return engine_pb2.TradeResponse(
                     success=False,
@@ -102,33 +111,44 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                     transaction_id="",
                     execution_price=0.0
                 )
-                    
+            
+            except Exception as error:
+                if not is_test_environment:
+                    db.rollback()
+                print(f"[ERROR] Transaction failed, session rolled back: {str(error)}")
+                return engine_pb2.TradeResponse(success=False, message=f"Database execution error: {str(error)}")
+            
+            finally:
+                # Close the database connections
+                if not is_test_environment:
+                    db.close()
+
         # Implement Sell transaction type
         elif request.trade_type == engine_pb2.SELL:
             try:
                 # Retrieve user record from db
-                if self.db_session is not None:
-                    user_record = self.db_session.query(User).filter(User.id == request.user_id).first()
+                if not is_test_environment:
+                    user_record = db.query(User).filter(User.id == request.user_id).first()
                     # Return failure if user not found
                     if user_record is None:
                         return engine_pb2.TradeResponse(
-                        success=False,
-                        message="Aborted, user not found.",
-                        transaction_id="",
-                        execution_price=0.0
-                    )
+                            success=False,
+                            message="Aborted, user not found.",
+                            transaction_id="",
+                            execution_price=0.0
+                        )
 
                     user_cash = user_record.cash_balance
 
                     # Calculate current total of shares owned by the user 
                     # by adding BUY transactions and subtracting SELL transactions
-                    bought_shares = self.db_session.query(func.sum(Transaction.shares)).filter(
+                    bought_shares = db.query(func.sum(Transaction.shares)).filter(
                         Transaction.user_id == request.user_id,
                         Transaction.ticker == request.ticker,
                         Transaction.transaction_type == "BUY"
                     ).scalar() or 0
 
-                    sold_shares = self.db_session.query(func.sum(Transaction.shares)).filter(
+                    sold_shares = db.query(func.sum(Transaction.shares)).filter(
                         Transaction.user_id == request.user_id,
                         Transaction.ticker == request.ticker,
                         Transaction.transaction_type == "SELL"
@@ -151,7 +171,7 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                 )
 
                 # Update db for user record if transaction succeeds
-                if self.db_session is not None:
+                if not is_test_environment:
                     user_record.cash_balance = new_balance
 
                     # Store transaction in db
@@ -162,10 +182,10 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                         price=cached_price,
                         transaction_type="SELL"
                     )
-                    self.db_session.add(new_transaction)
+                    db.add(new_transaction)
 
                     # Commit both additions to the database
-                    self.db_session.commit()
+                    db.commit()
 
                 return engine_pb2.TradeResponse(
                     success=True,
@@ -174,7 +194,6 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                     execution_price=cached_price
                 )
 
-            
             except ValueError as error:
                 # Catch errors for trying to sell too many shares
                 return engine_pb2.TradeResponse(
@@ -183,6 +202,15 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                     transaction_id="",
                     execution_price=0.0
                 )
+            
+            except Exception as error:
+                db.rollback()
+                print(f"[ERROR] Transaction failed, session rolled back: {str(error)}")
+                return engine_pb2.TradeResponse(success=False, message=f"Database execution error: {str(error)}")
+
+            finally:
+                if not is_test_environment:
+                    db.close()
 
         # Fallback return statement
             return engine_pb2.TradeResponse(
@@ -232,7 +260,7 @@ def serve():
     # Pass a placeholder initialization instance matching class signature.
     # To be updated with prod details later.
     engine_pb2_grpc.add_TradingServiceServicer_to_server(
-        TradingServiceServicer(redis_client=redis_client, db_session=db_session), 
+        TradingServiceServicer(redis_client=redis_client), 
         server
     )
     

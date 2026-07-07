@@ -13,17 +13,34 @@ class MockRedis:
     def get(self, key):
         # Simulates a cached price for the ticker passed
         return "150.0"
+    
+
+class MockDb:
+    def queery(self, model):
+        return self
+    def filter(slef, *args, **kwargs):
+        return self
+    def first(self):
+        class FakeUser:
+            id = 123
+            username = "test_user"
+            cash_balance = 50000.00
+        return FakeUser()
+    def commit(self):
+        pass
+    def add(self, instance):
+        pass
 
 # https://docs.pytest.org/en/6.2.x/fixture.html
 @pytest.fixture
 def grpc_channel():
     # Source descriptor from engine_pb2
     service_description = engine_pb2.DESCRIPTOR.services_by_name['TradingService']
-
     mock_redis = MockRedis()
+    fake_db = MockDb()
     
     descriptors_to_servicers = {
-        service_description: TradingServiceServicer(redis_client=mock_redis, db_session=None)
+        service_description: TradingServiceServicer(redis_client=mock_redis, db_session=fake_db)
         }
 
     # Run mock server and return it

@@ -20,7 +20,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User
+from app.models import User, Transaction
 
 # Load credentials from environment file
 load_dotenv(dotenv_path="../.env")
@@ -283,11 +283,17 @@ def show_dashboard_page(
         if current_user is None:
             return RedirectResponse(url="/login", status_code=303)
         
+        # Retrieve all past transactions for this user
+        user_history_ledger = db.query(Transaction).filter(
+            Transaction.user_id == user_id
+        ).order_by(Transaction.id.desc()).all() # Sort records from newst to oldest.
+        
         # If the token is good, render the dashboard, passing the user info to the jinja template
         return templates.TemplateResponse(
             request=request,
             name="dashboard.html",
-            context={"user": current_user}
+            context={"user": current_user,
+                     "transactions": user_history_ledger}
         )
     
     except jwt.PyJWTError:
@@ -342,7 +348,8 @@ def handle_trade_route(
                 request=request,
                 name="dashboard.html",
                 context={
-                    "user": current_user, "error": f"Invalid operation type specified: {trade_type.upper()}"
+                    "user": current_user,
+                    "error": f"Invalid operation type specified: {trade_type.upper()}"
                 }
             )
         
@@ -361,21 +368,37 @@ def handle_trade_route(
         if response.success:
             feedback_msg = f"Order executed! {trade_type.upper().strip()} {quantity} shares of {ticker.upper().strip()} at ${response.execution_price:.2f}"
             updated_user = db.query(User).filter(User.id == user_id).first() # Query db again for user with new details
+            # Get transactions history
+            updated_transactions = db.query(
+                Transaction
+                ).filter(Transaction.user_id == user_id).order_by(
+                    Transaction.id.desc()
+                ).all()
+            
             return templates.TemplateResponse(
                 request=request,
                 name="dashboard.html",
                 context={
                     "user": updated_user,
-                    "success": feedback_msg
+                    "success": feedback_msg,
+                    "transactions": updated_transactions # Send updated history to template
                 }
             )
         else:
+            # Get transactions history
+            current_transactions = db.query(
+                Transaction
+                ).filter(Transaction.user_id == user_id).order_by(
+                    Transaction.id.desc()
+                ).all()
+            
             return templates.TemplateResponse(
                 request=request,
                 name="dashboard.html",
                 context={
                     "user": current_user,
-                    "error": response.message
+                    "transactions": current_transactions,
+                    "error": response.message                    
                 }
             )
     except jwt.PyJWTError:
@@ -392,33 +415,3 @@ def handle_trade_route(
             }
         )
 
-
-# # ¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬
-#     # Transform the request into a gRPC packet
-#     if payload.trade_type.upper == "BUY":
-#         chosen_type = engine_pb2.BUY
-#     elif payload.trade_type.upper == "SELL":
-#         chosen_type = engine_pb2.SELL
-#     else:
-#         return {"success": False, "message": "Invalid trade type (only BUY or SELL are allowed)."}
-#     # Build the packet
-#     grpc_request = engine_pb2.TradeRequest(
-#         user_id=payload.user_id,
-#         ticker=payload.ticker.upper(),
-#         quantity=payload.quantity,
-#         trade_type=chosen_type
-#     )
-
-#     try:
-#         # Send the packet down the pipeline and capture the response
-#         engine_response = grpc_client["stub"].ExecuteTrade(grpc_request)
-
-#         # Return response to the user browser
-#         return {
-#             "success": engine_response.success,
-#             "message": engine_response.message,
-#             "transaction_id": engine_response.transaction_id,
-#             "execution_rice": engine_response.execution_price
-#         }
-#     except Exception as error:
-#         return {"success": False, "message": f"Could not connect to the engine: {str(error)}"}

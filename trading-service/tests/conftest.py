@@ -13,8 +13,7 @@ def db_session():
     
     # Create a session factory
     TestingSessionLocal = sessionmaker(bind=engine)
-    
-    
+        
     session = TestingSessionLocal()
     try:
         yield session  # Pass the active database connection to the test function
