@@ -4,8 +4,8 @@ import grpc
 import jwt
 
 # gRPC stubs
-import engine_pb2
-import engine_pb2_grpc
+from app import engine_pb2
+from app import engine_pb2_grpc
 
 # Hashing library for security purposes
 import hashlib
@@ -19,8 +19,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from database import get_db
-from models import User
+from app.database import get_db
+from app.models import User
 
 # Load credentials from environment file
 load_dotenv(dotenv_path="../.env")
@@ -104,7 +104,7 @@ async def websocket_price_stream(websocket: WebSocket, ticker: str):
 # Web server routes ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
 
 # Reference templates folder to be served
-templates=Jinja2Templates(directory="templates")
+templates=Jinja2Templates(directory="app/templates")
 
 # Define home route
 @app.get("/")
@@ -304,34 +304,121 @@ class TradeRequestModel(BaseModel):
     quantity: int = Field(..., gt=0) # integer greater than 0
     trade_type: str 
 
+# FastAPI Reference for Forms https://fastapi.tiangolo.com/tutorial/request-forms/
 @app.post("/trade")
-def handle_trade_route(payload: TradeRequestModel):
+def handle_trade_route(
+    request: Request,
+    ticker: str = Form(...),
+    quantity: int = Form(...),
+    trade_type: str = Form(...),
+    access_token: str = Cookie(None),
+    db: Session = Depends(get_db)
+                       ):
+# This route parses the data sent in the form and sends the gRPC request down
+# to the trading system to execute
 
-    # Transform the request into a gRPC packet
-    if payload.trade_type.upper == "BUY":
-        chosen_type = engine_pb2.BUY
-    elif payload.trade_type.upper == "SELL":
-        chosen_type = engine_pb2.SELL
-    else:
-        return {"success": False, "message": "Invalid trade type (only BUY or SELL are allowed)."}
-    # Build the packet
-    grpc_request = engine_pb2.TradeRequest(
-        user_id=payload.user_id,
-        ticker=payload.ticker.upper(),
-        quantity=payload.quantity,
-        trade_type=chosen_type
-    )
-
+    # Check that there is a token submitted with the form
+    if not access_token:
+        return RedirectResponse(url="/login", status_code=303) # Send user to login
+    
     try:
-        # Send the packet down the pipeline and capture the response
-        engine_response = grpc_client["stub"].ExecuteTrade(grpc_request)
+        # Extract the user id from the token
+        decoded_payload = jwt.decode(access_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = decoded_payload.get("user_id")
+        current_user = db.query(User).filter(User.id == user_id).first()
+        
+        # If there is no match in the db for the user sent with the token
+        if current_user is None:
+            return RedirectResponse(url="/login", status_code=303) # Send user back to login
 
-        # Return response to the user browser
-        return {
-            "success": engine_response.success,
-            "message": engine_response.message,
-            "transaction_id": engine_response.transaction_id,
-            "execution_rice": engine_response.execution_price
-        }
-    except Exception as error:
-        return {"success": False, "message": f"Could not connect to the engine: {str(error)}"}
+        # parse the values submitted in the form to be sent with the proto file
+        if trade_type.upper() == "BUY":
+            proto_trade_type = engine_pb2.BUY
+        elif trade_type.upper() == "SELL":
+            proto_trade_type = engine_pb2.SELL
+        else:
+            # Return an error as the type submitted is not supported
+            return templates.TemplateResponse(
+                request=request,
+                name="dashboard.html",
+                context={
+                    "user": current_user, "error": f"Invalid operation type specified: {trade_type.upper()}"
+                }
+            )
+        
+        # Compile all fields into gRPC request to be sent
+        proto_request = engine_pb2.TradeRequest(
+            user_id=user_id,
+            ticker=ticker.upper().strip(),
+            quantity=quantity,
+            trade_type=proto_trade_type
+        )
+
+        # Send the request using the stub generated in the context manager
+        response = grpc_client["stub"].ExecuteTrade(proto_request, timeout=5)
+
+        # Redirect user to dashboard with success or error message
+        if response.success:
+            feedback_msg = f"Order executed! {trade_type.upper().strip()} {quantity} shares of {ticker.upper().strip()} at ${response.execution_price:.2f}"
+            updated_user = db.query(User).filter(User.id == user_id).first() # Query db again for user with new details
+            return templates.TemplateResponse(
+                request=request,
+                name="dashboard.html",
+                context={
+                    "user": updated_user,
+                    "success": feedback_msg
+                }
+            )
+        else:
+            return templates.TemplateResponse(
+                request=request,
+                name="dashboard.html",
+                context={
+                    "user": current_user,
+                    "error": response.message
+                }
+            )
+    except jwt.PyJWTError:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    except grpc.RpcError as error:
+        # Gracefullt catch connection errrs from gRPC trading engine
+        return templates.TemplateResponse(
+            request=request,
+            name="dashboard.html",
+            context={
+                "user": current_user,
+                "error": f"Main transaction engne connection failure: {error.details()}"
+            }
+        )
+
+
+# # ¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬
+#     # Transform the request into a gRPC packet
+#     if payload.trade_type.upper == "BUY":
+#         chosen_type = engine_pb2.BUY
+#     elif payload.trade_type.upper == "SELL":
+#         chosen_type = engine_pb2.SELL
+#     else:
+#         return {"success": False, "message": "Invalid trade type (only BUY or SELL are allowed)."}
+#     # Build the packet
+#     grpc_request = engine_pb2.TradeRequest(
+#         user_id=payload.user_id,
+#         ticker=payload.ticker.upper(),
+#         quantity=payload.quantity,
+#         trade_type=chosen_type
+#     )
+
+#     try:
+#         # Send the packet down the pipeline and capture the response
+#         engine_response = grpc_client["stub"].ExecuteTrade(grpc_request)
+
+#         # Return response to the user browser
+#         return {
+#             "success": engine_response.success,
+#             "message": engine_response.message,
+#             "transaction_id": engine_response.transaction_id,
+#             "execution_rice": engine_response.execution_price
+#         }
+#     except Exception as error:
+#         return {"success": False, "message": f"Could not connect to the engine: {str(error)}"}

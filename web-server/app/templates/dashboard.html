@@ -1,4 +1,17 @@
 {% extends "base.html" %} {% block content %}
+    {% if success %}
+        <div class="alert alert-success alert-dismissible fade show text-center mb-4" role="alert">
+            🎉 <strong>Success:</strong> {{ success }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endif %}
+
+    {% if error %}
+        <div class="alert alert-danger alert-dismissible fade show text-center mb-4" role="alert">
+            ❌ <strong>Error:</strong> {{ error }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endif %}
 <div class="row">
     <!-- LEFT PANEL: Portfolio Summary & Execution Form -->
     <div class="col-md-5">
