@@ -86,6 +86,8 @@
         </div>
     </div>
 
+    
+
     <!-- RIGHT PANEL: Live Ticker Feed Monitoring Station -->
     <div class="col-md-7">
         <div class="card shadow-sm h-100">
@@ -123,5 +125,65 @@
             </div>
         </div>
     </div>
+
+    <!-- LOWER LAYER CONTAINER: Transaction Ledger Registry Table -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card shadow-sm mb-5">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">📜 Historical Activity Ledger Receipt Register</h5>
+                <span class="badge bg-secondary text-white fw-bold">Audit Trail</span>
+            </div>
+            <div class="card-body p-0">
+                
+                <!-- Jinja2 Conditional Check: Verify if data records are active -->
+                {% if transactions and transactions|length > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0 text-center align-middle">
+                        <thead class="table-light text-uppercase small font-monospace">
+                            <tr>
+                                <th>Transaction Reference ID</th>
+                                <th>Stock Symbol</th>
+                                <th>Order Type Action</th>
+                                <th>Volume (Shares)</th>
+                                <th>Executed Rate</th>
+                                <th>Total Capital Impact</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Loop systematically across every entry passed from our database query -->
+                            {% for trade in transactions %}
+                            <tr>
+                                <td class="text-muted small">#{{ trade.id }}</td>
+                                <td><span class="badge bg-light text-dark border fw-bold text-uppercase">{{ trade.ticker }}</span></td>
+                                <td>
+                                    {% if trade.transaction_type == 'BUY' %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-3">BUY</span>
+                                    {% else %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3">SELL</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ trade.shares }}</td>
+                                <td class="fw-bold text-secondary">${{ "%.2f"|format(trade.price) }}</td>
+                                <td class="fw-bold {% if trade.transaction_type == 'BUY' %}text-danger{% else %}text-success{% endif %}">
+                                    {% if trade.transaction_type == 'BUY' %}-{% else %}+{% endif %}${{ "%.2f"|format(trade.shares * trade.price) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <!-- Fallback presentation template if the table row count returns zero entries -->
+                <div class="text-center p-5">
+                    <p class="text-muted mb-0">No transaction receipts documented in this profile instance. Complete your initial market trade above to initialize the audit ledger track line.</p>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+
 </div>
 {% endblock %}
