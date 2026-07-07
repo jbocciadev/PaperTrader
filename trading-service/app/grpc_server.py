@@ -1,12 +1,18 @@
 # https://grpc.io/docs/languages/python/quickstart/
 # https://medium.com/@dneprokos/sdet-exploring-grpc-testing-practical-examples-with-postman-c-and-python-clients-f1a29f91e3eb
 
+import os
 import grpc
-from app import engine_pb2_grpc
-from app import engine_pb2
-from app import engine
+import engine_pb2_grpc
+import engine_pb2
+import engine
 from app.models import User, Transaction
+from concurrent import futures
 from sqlalchemy import func
+from dotenv import load_dotenv
+from upstash_redis import Redis
+
+from database import SessionLocal
 
 class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
     """
@@ -198,3 +204,31 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
             cash_balance=10000.0,
             holdings_summary="10 sahres of AAPL (stub)"
         )
+
+
+def serve():
+    """
+    Initializes a thread pool, binds the database logic servicer,
+    and opens network port 50051 to listen for FastAPI gateway requests.
+    Reference: https://grpc.io and https://github.com/grpc/grpc/blob/v1.82.0/examples/python/helloworld/greeter_server.py
+    """
+    # Open a standard background thread pool to handle concurrent trades
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    
+    # Register business logic class directly to the running network server
+    # Pass a placeholder initialization instance matching class signature.
+    # To be updated with prod details later.
+    engine_pb2_grpc.add_TradingServiceServicer_to_server(
+        TradingServiceServicer(redis_client=None, db_session=None), 
+        server
+    )
+    
+    # Securely lock the server to handle internal insecure communication on port 50051
+    server.add_insecure_port("[::]:50051")
+    print("\n---------------------------------------------------------")
+    print("🚀 SUCCESS: gRPC Core Trading Server is active on port 50051!")
+    print("---------------------------------------------------------\n")
+    
+    # Fire the persistent execution loop
+    server.start()
+    server.wait_for_termination()
