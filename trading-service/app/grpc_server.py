@@ -146,7 +146,7 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                     redis_client=self.redis_client,
                     current_cash=user_cash,
                     held_shares=user_held_shares,
-                    shares_to_sell=request.quantit,
+                    shares_to_sell=request.quantity,
                     ticker=request.ticker
                 )
 
@@ -212,6 +212,19 @@ def serve():
     and opens network port 50051 to listen for FastAPI gateway requests.
     Reference: https://grpc.io and https://github.com/grpc/grpc/blob/v1.82.0/examples/python/helloworld/greeter_server.py
     """
+    
+    # Load environment variabnles from .env file
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    shared_env_path = os.path.join(current_dir, "../../.env")
+    load_dotenv(dotenv_path=shared_env_path)
+
+    # Create Redis and PostgreSQL connection clients
+    redis_url = os.getenv("UPSTASH_REDIS_REST_URL")
+    redis_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+    redis_client = Redis(url=redis_url, token=redis_token)
+
+    db_session = SessionLocal()
+    
     # Open a standard background thread pool to handle concurrent trades
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     
@@ -219,7 +232,7 @@ def serve():
     # Pass a placeholder initialization instance matching class signature.
     # To be updated with prod details later.
     engine_pb2_grpc.add_TradingServiceServicer_to_server(
-        TradingServiceServicer(redis_client=None, db_session=None), 
+        TradingServiceServicer(redis_client=redis_client, db_session=db_session), 
         server
     )
     

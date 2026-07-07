@@ -27,7 +27,7 @@ def execute_buy_transaction(redis_client, current_cash, shares, ticker):
 
 # Calculates outcome of a buy order
 def calculate_sell_order(current_cash, held_shares, shares_to_sell, execution_price):
-    if shares_to_sell < held_shares:
+    if held_shares < shares_to_sell:
         raise ValueError("Insufficient shares to execute sell order.")
     
     total_proceeds = shares_to_sell * execution_price
