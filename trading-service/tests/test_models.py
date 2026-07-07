@@ -8,7 +8,7 @@ def test_create_user_model(db_session):
     Base.metadata.create_all(bind=db_session.get_bind())
 
     # Initialize User record with test funds
-    new_user = User(username="trader_juan", cash_balance=10000.0)
+    new_user = User(username="trader_juan",password_hash="abc123xyz", cash_balance=10000.0)
 
     # Add and save record into database
     db_session.add(new_user)
@@ -28,7 +28,7 @@ def test_create_transaction_ledger_entry(db_session):
     Base.metadata.create_all(bind=db_session.get_bind())
 
     # Create mock user for the test
-    user = User(username="test_investor", cash_balance=50000.0)
+    user = User(username="test_investor", password_hash="abc123xyz", cash_balance=50000.0)
     db_session.add(user)
     db_session.commit()
 

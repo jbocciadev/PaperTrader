@@ -348,7 +348,8 @@ def handle_trade_route(
                 request=request,
                 name="dashboard.html",
                 context={
-                    "user": current_user, "error": f"Invalid operation type specified: {trade_type.upper()}"
+                    "user": current_user,
+                    "error": f"Invalid operation type specified: {trade_type.upper()}"
                 }
             )
         
@@ -367,21 +368,37 @@ def handle_trade_route(
         if response.success:
             feedback_msg = f"Order executed! {trade_type.upper().strip()} {quantity} shares of {ticker.upper().strip()} at ${response.execution_price:.2f}"
             updated_user = db.query(User).filter(User.id == user_id).first() # Query db again for user with new details
+            # Get transactions history
+            updated_transactions = db.query(
+                Transaction
+                ).filter(Transaction.user_id == user_id).order_by(
+                    Transaction.id.desc()
+                ).all()
+            
             return templates.TemplateResponse(
                 request=request,
                 name="dashboard.html",
                 context={
                     "user": updated_user,
-                    "success": feedback_msg
+                    "success": feedback_msg,
+                    "transactions": updated_transactions # Send updated history to template
                 }
             )
         else:
+            # Get transactions history
+            current_transactions = db.query(
+                Transaction
+                ).filter(Transaction.user_id == user_id).order_by(
+                    Transaction.id.desc()
+                ).all()
+            
             return templates.TemplateResponse(
                 request=request,
                 name="dashboard.html",
                 context={
                     "user": current_user,
-                    "error": response.message
+                    "transactions": current_transactions,
+                    "error": response.message                    
                 }
             )
     except jwt.PyJWTError:
