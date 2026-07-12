@@ -1,0 +1,85 @@
+{% extends "base.html" %} {% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <!-- Main user acct management card -->
+        <div class="card shadow-sm mt-5">
+            <div class="card-header bg-dark text-white text-center">
+                <h4 class="mb-0">👤 User Account Profile Desk</h4>
+            </div>
+            <div class="card-body p-4">
+                <div class="mb-4">
+                    <label
+                        class="text-uppercase text-muted small fw-bold d-block"
+                        >Account Holder Username
+                    </label>
+                    <h5 class="fw-bold text-secondary">{{ user.username }}</h5>
+                </div>
+                <div class="mb-4">
+                    <label
+                        class="text-uppercase text-muted small fw-bold d-block"
+                        >Current Balance</label
+                    >
+                    <h3 class="fw-bold text-success">
+                        ${{ "%.2f"|format(user.cash_balance) }}
+                    </h3>
+                </div>
+                <hr class="my-4" />
+
+                <!-- Account reset form -->
+                <div class="bg-light p-3 rounded border mb-4">
+                    <h6 class="fw-bold text-warning mb-2">
+                        🔄 Back to Square One Reset
+                    </h6>
+                    <p class="text-muted small mb-3">
+                        Warning: This operation will restore your capital to
+                        $10,000.00 and permanently liquidate all active stock
+                        positions from your history ledger.
+                    </p>
+                    <form action="/profile/reset" method="POST" onsubmit="
+                            return confirm(
+                                'Are you absolutely certain you want to reset your account? This will delete all your transactions and bring your balance back to $10,000.00'
+                            );
+                        "">
+                        <div class="d-grid">
+                            <button
+                                type="submit"
+                                class="btn btn-warning btn-sm fw-bold">
+                                Execute Total Balance & Position Reset
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Account Deletion form -->
+                <div class="bg-light p-3 rounded border border-danger">
+                    <h6 class="fw-bold text-danger mb-2">
+                        ⛔ Permanent Profile Erasure
+                    </h6>
+                    <p class="text-muted small mb-3">
+                        Warning: This will permanently delete your user profile
+                        and transaction records from our database.
+                        <strong>This action cannot be undone.</strong>
+                    </p>
+                    <form
+                        action="/profile/delete"
+                        method="POST"
+                        onsubmit="
+                            return confirm(
+                                'Are you absolutely certain you want to permanently delete your entire account profile?'
+                            );
+                        ">
+                        <div class="d-grid">
+                            <button
+                                type="submit"
+                                class="btn btn-danger btn-sm fw-bold">
+                                Permanently Terminate Account Profile
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -415,3 +415,98 @@ def handle_trade_route(
             }
         )
 
+
+# Routes for the User Profile ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
+
+@app.get("/profile")
+def show_profile_page(
+    request: Request,
+    access_token: str = Cookie(None),
+    db: Session = Depends(get_db)
+):
+    '''Presents the user profile view with account management options.'''
+    # Session cookie validation
+    if not access_token:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    try:
+        # get userID from cookie
+        decoded_payload = jwt.decode(access_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = decoded_payload.get("user_id")
+        current_user = db.query(User).filter(User.id == user_id).first()
+
+        if current_user is None:
+            return RedirectResponse(url="/login", status_code=303)
+        
+        # Present profile page from template if user credentials are ok
+        return templates.TemplateResponse(
+            request=request,
+            name="profile.html",
+            context={"user":current_user}
+        )
+    except jwt.PyJWTError:
+        return RedirectResponse(url="/login", status_code=303)
+    
+@app.post("/profile/reset")
+def execute_profile_reset(
+    request:Request,
+    access_token: str = Cookie(None),
+    db: Session = Depends(get_db)
+):
+    '''Resets all account activity and brings cash balance back to $10,000.00'''
+    if not access_token:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    try:
+        # get userID from cookie
+        decoded_payload = jwt.decode(access_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = decoded_payload.get("user_id")
+        current_user = db.query(User).filter(User.id == user_id).first()
+
+        if current_user is None:
+            return RedirectResponse(url="/login", status_code=303)
+        
+        # If user validated ok, reset values and erase transactions
+        current_user.cash_balance = 10000.00
+        db.query(Transaction).filter(Transaction.user_id == user_id).delete()
+        db.commit()
+        print(f"[DATABASE] Full reset executed for user ID {user_id}")
+
+        return RedirectResponse(url="/profile", status_code=303)
+    
+    except jwt.PyJWTError:
+        return RedirectResponse(url="/login", status_code=303)
+    
+@app.post("/profile/delete")
+def execute_profile_deletion(
+    request: Request,
+    access_token: str = Cookie(None),
+    db: Session = Depends(get_db)
+):
+    '''Permanently deletes the user's profile, transactions, cookies, etc.'''
+    if not access_token:
+        return RedirectResponse(url="/login", status_code=303)
+        
+    try:
+        decoded_payload = jwt.decode(access_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = decoded_payload.get("user_id")
+        current_user = db.query(User).filter(User.id == user_id).first()
+        
+        if current_user is None:
+            return RedirectResponse(url="/login", status_code=303)
+        
+        # Erase all Transaction entries
+        db.query(Transaction).filter(Transaction.user_id == user_id).delete()
+        # Erase the user's entry in Users table
+        db.delete(current_user)
+
+        db.commit()
+        print(f"[DATABASE] Records for user ID {user_id} deleted permanently.")
+
+        response = RedirectResponse(url="/register", status_code=303)
+
+        response.delete_cookie(key="access_token", path="/")
+        return response
+    except jwt.PyJWTError:
+        return RedirectResponse(url="/login", status_code=303)
+
