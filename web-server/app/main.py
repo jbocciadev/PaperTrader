@@ -415,3 +415,35 @@ def handle_trade_route(
             }
         )
 
+
+# Routes for the User Profile ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
+
+@app.get("/profile")
+def show_profile_page(
+    request: Request,
+    access_token: str = Cookie(None),
+    db: Session = Depends(get_db)
+):
+    '''Presents the user profile view with account management options.'''
+    # Session cookie validation
+    if not access_token:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    try:
+        # get userID from cookie
+        decoded_payload = jwt.decode(access_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = decoded_payload.get("user_id")
+        current_user = db.query(User).filter(User.id == user_id).first()
+
+        if current_user is None:
+            return RedirectResponse(url="/login", status_code=303)
+        
+        # Present profile page from template if user credentials are ok
+        return templates.TemplateResponse(
+            request=request,
+            name="profile.html",
+            context={"user":current_user}
+        )
+    except jwt.PyJWTError:
+        return RedirectResponse(url="/login", status_code=303)
+    

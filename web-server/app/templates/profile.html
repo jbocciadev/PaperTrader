@@ -1,0 +1,54 @@
+{% extends "base.html" %} {% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <!-- Main user acct management card -->
+        <div class="card shadow-sm mt-5">
+            <div class="card-header bg-dark text-white text-center">
+                <h4 class="mb-0">👤 User Account Profile Desk</h4>
+            </div>
+            <div class="card-body p-4">
+                <div class="mb-4">
+                    <label
+                        class="text-uppercase text-muted small fw-bold d-block"
+                        >Account Holder Username
+                    </label>
+                    <h5 class="fw-bold text-secondary">{{ user.username }}</h5>
+                </div>
+                <div class="mb-4">
+                    <label
+                        class="text-uppercase text-muted small fw-bold d-block"
+                        >Current Balance</label
+                    >
+                    <h3 class="fw-bold text-success">
+                        ${{ "%.2f"|format(user.cash_balance) }}
+                    </h3>
+                </div>
+                <hr class="my-4" />
+
+                <!-- Reset Financial Sandbox Form Control Desk -->
+                <div class="bg-light p-3 rounded border mb-3">
+                    <h6 class="fw-bold text-danger mb-2">
+                        ⚠️ Sandbox Financial Simulation Reset
+                    </h6>
+                    <p class="text-muted small mb-3">
+                        Running low on capital or want a fresh start? Clicking
+                        below will reset your cash balance directly back to the
+                        baseline $10,000.00 limits.
+                    </p>
+
+                    <form action="/profile/reset" method="POST">
+                        <div class="d-grid">
+                            <button
+                                type="submit"
+                                class="btn btn-outline-danger btn-sm">
+                                Reset Sandbox Balance to $10,000.00
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
