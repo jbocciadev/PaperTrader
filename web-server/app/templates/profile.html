@@ -25,23 +25,54 @@
                 </div>
                 <hr class="my-4" />
 
-                <!-- Reset Financial Sandbox Form Control Desk -->
-                <div class="bg-light p-3 rounded border mb-3">
-                    <h6 class="fw-bold text-danger mb-2">
-                        ⚠️ Sandbox Financial Simulation Reset
+                <!-- Account reset form -->
+                <div class="bg-light p-3 rounded border mb-4">
+                    <h6 class="fw-bold text-warning mb-2">
+                        🔄 Back to Square One Reset
                     </h6>
                     <p class="text-muted small mb-3">
-                        Running low on capital or want a fresh start? Clicking
-                        below will reset your cash balance directly back to the
-                        baseline $10,000.00 limits.
+                        Warning: This operation will restore your capital to
+                        $10,000.00 and permanently liquidate all active stock
+                        positions from your history ledger.
                     </p>
-
-                    <form action="/profile/reset" method="POST">
+                    <form action="/profile/reset" method="POST" onsubmit="
+                            return confirm(
+                                'Are you absolutely certain you want to reset your account? This will delete all your transactions and bring your balance back to $10,000.00'
+                            );
+                        "">
                         <div class="d-grid">
                             <button
                                 type="submit"
-                                class="btn btn-outline-danger btn-sm">
-                                Reset Sandbox Balance to $10,000.00
+                                class="btn btn-warning btn-sm fw-bold">
+                                Execute Total Balance & Position Reset
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Account Deletion form -->
+                <div class="bg-light p-3 rounded border border-danger">
+                    <h6 class="fw-bold text-danger mb-2">
+                        ⛔ Permanent Profile Erasure
+                    </h6>
+                    <p class="text-muted small mb-3">
+                        Warning: This will permanently delete your user profile
+                        and transaction records from our database.
+                        <strong>This action cannot be undone.</strong>
+                    </p>
+                    <form
+                        action="/profile/delete"
+                        method="POST"
+                        onsubmit="
+                            return confirm(
+                                'Are you absolutely certain you want to permanently delete your entire account profile?'
+                            );
+                        ">
+                        <div class="d-grid">
+                            <button
+                                type="submit"
+                                class="btn btn-danger btn-sm fw-bold">
+                                Permanently Terminate Account Profile
                             </button>
                         </div>
                     </form>
