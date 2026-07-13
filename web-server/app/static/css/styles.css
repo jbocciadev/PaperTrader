@@ -1,0 +1,32 @@
+/* Visual Flash Animations */
+.price-cell {
+    transition:
+        background-color 0.4s ease,
+        color 0.4s ease;
+    padding: 4px 12px;
+    border-radius: 4px;
+    display: inline-block;
+    font-weight: bold;
+}
+.flash-up {
+    background-color: rgba(40, 167, 69, 0.25) !important; /* Soft Green Flash */
+    color: #28a745 !important;
+}
+.flash-down {
+    background-color: rgba(220, 53, 69, 0.25) !important; /* Soft Red Flash */
+    color: #dc3545 !important;
+}
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+.animate-pulse {
+    animation: pulse 1.5s infinite;
+}

@@ -1,4 +1,7 @@
-{% extends "base.html" %} {% block content %} {% if success %}
+{% extends "base.html" %} {% block styles %}
+<style src="{{ url_for('static', path='css/styles.css') }}"></style>
+<link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}" />
+{% endblock %} {% block content %} {% if success %}
 <div
     class="alert alert-success alert-dismissible fade show text-center mb-4"
     role="alert">
@@ -126,31 +129,53 @@
         <div class="card shadow-sm h-100">
             <div
                 class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">📺 Live Market Ticker Streams</h5>
+                <h5 class="mb-0">Live Market Watch Station</h5>
                 <span
                     class="badge bg-white text-success fw-bold"
                     id="stream-status"
-                    >Idle</span
+                    >Connecting...</span
                 >
             </div>
-            <div
-                class="card-body bg-light text-center d-flex flex-column justify-content-center p-5"
-                id="monitor-box">
-                <div id="price-display-panel" style="display: none">
-                    <h1
-                        class="display-1 fw-bold text-success mb-2"
-                        id="live-price">
-                        $0.00
-                    </h1>
-                    <h3 class="text-muted text-uppercase" id="live-symbol">
-                        NONE
-                    </h3>
-                </div>
-                <div id="placeholder-panel">
-                    <p class="text-muted mb-0">
-                        Type a ticker symbol in the execution desk to initialize
-                        real-time price monitoring streams.
-                    </p>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table
+                        class="table table-hover align-middle mb-0 text-center">
+                        <thead
+                            class="table-light small font-monospace text-uppercase">
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Current Price</th>
+                                <th>Daily Change</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Dynamically loops through the list from your .env file -->
+                            {% for ticker in tickers %}
+                            <tr>
+                                <td>
+                                    <span
+                                        class="badge bg-dark text-white fw-bold px-3 py-2"
+                                        >{{ ticker }}</span
+                                    >
+                                </td>
+                                <td>
+                                    <span
+                                        id="price-{{ ticker }}"
+                                        class="price-cell text-muted"
+                                        >$0.00</span
+                                    >
+                                </td>
+                                <td>
+                                    <span
+                                        id="change-{{ ticker }}"
+                                        class="small text-muted"
+                                        >--</span
+                                    >
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -243,4 +268,7 @@
         </div>
     </div>
 </div>
+{% endblock %} {% block scripts %}
+<!-- Serves static files using FastAPI's static asset helper -->
+<script src="{{ url_for('static', path='js/ticker-stream.js') }}"></script>
 {% endblock %}

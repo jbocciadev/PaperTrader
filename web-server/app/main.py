@@ -3,6 +3,7 @@ import asyncio
 import grpc
 import jwt
 import json
+import random
 
 # gRPC stubs
 from app import engine_pb2
@@ -18,6 +19,7 @@ from dotenv import load_dotenv
 from upstash_redis import Redis
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -28,6 +30,10 @@ load_dotenv(dotenv_path="../.env")
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+TICKERS_LIST = []
+for t in os.getenv("TICKERS", "").split(","):
+    TICKERS_LIST.append(t)
 
 # gRPC client object
 grpc_client = {}
@@ -59,9 +65,10 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
     
-
+# Redis-updates ws routes ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
 # Wire-up the Redis server connection
 # Reference: https://upstash.com/docs/redis/tutorials/pythonapi
 
@@ -102,10 +109,60 @@ async def websocket_price_stream(websocket: WebSocket, ticker: str):
         print(f"Client disconnected cleanly from price stream: {ticker.upper()}")
 
 
-# Reference templates folder to be served
-templates=Jinja2Templates(directory="app/templates")
+@app.websocket("/ws/market-feed")
+async def websocket_market_feed_stream(websocket: WebSocket):
+    await websocket.accept()
+    
+    try:
+        while True:
+            market_matrix_payload = {}
+            
+            for ticker in TICKERS_LIST:
+                live_key = f"stock:{ticker}:price"
+                snap_key = f"stock:{ticker}:snapshot"
+                
+                # Fetch cache instances from Upstash Redis
+                live_price_raw = redis_client.get(live_key)
+                snapshot_raw = redis_client.get(snap_key)
+                
+                # Default data structure model matching Finnhub schemas
+                ticker_data = {"price": 0.0, "open": 0.0, "change": 0.0, "pct_change": 0.0}
+                
+                if snapshot_raw:
+                    try:
+                        snap_json = json.loads(snapshot_raw)
+                        # Extract metrics explicitly out of your snapshot JSON profile
+                        ticker_data["open"] = float(snap_json.get("o", 0.0))
+                        ticker_data["change"] = float(snap_json.get("d", 0.0))
+                        ticker_data["pct_change"] = float(snap_json.get("dp", 0.0))
+                    except Exception:
+                        pass
+                
+                if live_price_raw:
+                    ticker_data["price"] = float(live_price_raw)
+                elif snapshot_raw and "snap_json" in locals():
+                    # Fallback to the snapshot current/close rate if no live trade is active
+                    ticker_data["price"] = float(snap_json.get("c", ticker_data["open"]))
+                
+                market_matrix_payload[ticker] = ticker_data
+            
+            # Broadcast the updates down to the frontend script to display
+            await websocket.send_json(market_matrix_payload)
+            
+            # Sleep a random interval between 1 and 2 seconds 
+            await asyncio.sleep(random.uniform(1.0, 2.0))
+            
+    except WebSocketDisconnect:
+        print("[WS MARKET FEED] Client browser window session closed cleanly.")
+    except Exception as e:
+        print(f"[WS SERVER ERROR] {e}")
+
+
 
 # Web server routes ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
+
+# Reference templates folder to be served
+templates=Jinja2Templates(directory="app/templates")
 
 # Define home route
 @app.get("/")
@@ -329,7 +386,8 @@ def show_dashboard_page(
         response = templates.TemplateResponse(
             request=request,
             name="dashboard.html",
-            context={"user": current_user,
+            context={"tickers": TICKERS_LIST,
+                     "user": current_user,
                      "transactions": user_history_ledger,
                      "holdings_value": holdings_value,
                      "success": success_msg,
@@ -427,7 +485,7 @@ def handle_trade_route(
     
     except grpc.RpcError as error:
         # Gracefullt catch connection errrs from gRPC trading engine
-        feedback_msg =  f"Main transaction engne connection failure: {error.details()}
+        feedback_msg =  f"Main transaction engne connection failure: {error.details()}"
         redir_response = RedirectResponse(url="/dashboard", status_code=303)
         redir_response.set_cookie(key="error_msg", value=feedback_msg, max_age=10)
         return redir_response
