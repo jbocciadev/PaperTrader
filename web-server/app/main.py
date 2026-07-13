@@ -2,6 +2,8 @@ import os
 import asyncio
 import grpc
 import jwt
+import json
+import random
 
 # gRPC stubs
 from app import engine_pb2
@@ -17,6 +19,7 @@ from dotenv import load_dotenv
 from upstash_redis import Redis
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -27,6 +30,10 @@ load_dotenv(dotenv_path="../.env")
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+TICKERS_LIST = []
+for t in os.getenv("TICKERS", "").split(","):
+    TICKERS_LIST.append(t)
 
 # gRPC client object
 grpc_client = {}
@@ -58,20 +65,71 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
     
-
+# Redis-updates ws routes ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
 # Wire-up the Redis server connection
 # Reference: https://upstash.com/docs/redis/tutorials/pythonapi
 
-redis_url = os.getenv("REDIS_URL")
-redis_token = os.getenv("REDIS_TOKEN")
+redis_url = os.getenv("UPSTASH_REDIS_REST_URL")
+redis_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
 
 # Start Redis client from imported class
 redis_client = Redis(url=redis_url, token=redis_token)
 
 
 # Reference: https://realpython.com/async-io-python/
+
+@app.websocket("/ws/market-feed")
+async def websocket_market_feed_stream(websocket: WebSocket):
+    # Websocket route that will stream price updates to the front end from the redis db
+    await websocket.accept()
+    
+    try:
+        while True:
+            market_matrix_payload = {}
+            
+            for ticker in TICKERS_LIST:
+                live_key = f"stock:{ticker}:price"
+                snap_key = f"stock:{ticker}:snapshot"
+                
+                # Fetch cache instances from Upstash Redis
+                live_price_raw = redis_client.get(live_key)
+                snapshot_raw = redis_client.get(snap_key)
+                
+                # Default data structure model matching Finnhub schemas
+                ticker_data = {"price": 0.0, "open": 0.0, "change": 0.0, "pct_change": 0.0}
+                
+                if snapshot_raw:
+                    try:
+                        snap_json = json.loads(snapshot_raw)
+                        # Extract metrics explicitly out of your snapshot JSON profile
+                        ticker_data["open"] = float(snap_json.get("o", 0.0))
+                        ticker_data["change"] = float(snap_json.get("d", 0.0))
+                        ticker_data["pct_change"] = float(snap_json.get("dp", 0.0))
+                    except Exception:
+                        pass
+                
+                if live_price_raw:
+                    ticker_data["price"] = float(live_price_raw)
+                elif snapshot_raw and "snap_json" in locals():
+                    # Fallback to the snapshot current/close rate if no live trade is active
+                    ticker_data["price"] = float(snap_json.get("c", ticker_data["open"]))
+                
+                market_matrix_payload[ticker] = ticker_data
+            
+            # Broadcast the updates down to the frontend script to display
+            await websocket.send_json(market_matrix_payload)
+            
+            # Sleep a random interval between 1 and 2 seconds 
+            await asyncio.sleep(random.uniform(1.0, 2.0))
+            
+    except WebSocketDisconnect:
+        print("[WS MARKET FEED] Client browser window session closed cleanly.")
+    except Exception as e:
+        print(f"[WS SERVER ERROR] {e}")
+
 @app.websocket("/ws/prices/{ticker}")
 async def websocket_price_stream(websocket: WebSocket, ticker: str):
     """
@@ -115,7 +173,8 @@ def home(
     ):
     # Reference: https://fastapi.tiangolo.com/advanced/templates/
     """
-    Route that serves the main landing page. If a user is logged in, it will rende the dashboard
+    Route that serves the main landing page. If a user is logged in,
+    it will render the home screen.
     """
 
     current_user = None
@@ -260,7 +319,9 @@ def process_logout():
 def show_dashboard_page(
     request: Request,
     access_token: str = Cookie(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    success_msg: str = Cookie(None), # Retrieve success and error messages from the cookies
+    error_msg: str = Cookie(None)
 ):
 
     """
@@ -288,13 +349,55 @@ def show_dashboard_page(
             Transaction.user_id == user_id
         ).order_by(Transaction.id.desc()).all() # Sort records from newst to oldest.
         
+        # Calculate amount of shares held for each symbol
+        shares_inventory = {}
+        for trade in user_history_ledger:
+            ticker = trade.ticker.upper().strip()
+            volume = trade.shares
+            if trade.transaction_type.upper() == "BUY":
+                shares_inventory[ticker] = shares_inventory.get(ticker, 0) + volume
+            elif trade.transaction_type.upper() == "SELL":
+                shares_inventory[ticker] = shares_inventory.get(ticker, 0) - volume
+
+        # Calculate the combined value of all shares owned
+        holdings_value = 0.0
+        for ticker, total_shares in shares_inventory.items():
+            if total_shares > 0:
+                # Target the exact naming token
+                cache_key = f"stock:{ticker}:price"
+                live_price_raw = redis_client.get(cache_key)
+                
+                # If cache is empty default to snapshot opening price
+                if live_price_raw:
+                    live_price = float(live_price_raw)
+                else:
+                    cache_key = f"stock:{ticker}:snapshot"
+                    snapshot_raw = redis_client.get(cache_key)
+
+                    if snapshot_raw:
+                        snapshot_data = json.loads(snapshot_raw)
+                        live_price = float(snapshot_data["o"])
+                    else:
+                        live_price = 0.0
+                
+                holdings_value += (total_shares * live_price)
+
         # If the token is good, render the dashboard, passing the user info to the jinja template
-        return templates.TemplateResponse(
+        response = templates.TemplateResponse(
             request=request,
             name="dashboard.html",
-            context={"user": current_user,
-                     "transactions": user_history_ledger}
+            context={"tickers": TICKERS_LIST,
+                     "user": current_user,
+                     "transactions": user_history_ledger,
+                     "holdings_value": holdings_value,
+                     "success": success_msg,
+                     "error": error_msg}
         )
+        if success_msg:
+            response.delete_cookie("success_msg")
+        if error_msg:
+            response.delete_cookie("error_msg")
+        return response
     
     except jwt.PyJWTError:
         # Cath corrupted tokens and redirect to login page
@@ -365,55 +468,27 @@ def handle_trade_route(
         response = grpc_client["stub"].ExecuteTrade(proto_request, timeout=5)
 
         # Redirect user to dashboard with success or error message
+        # Use session cookies to flash messages
         if response.success:
             feedback_msg = f"Order executed! {trade_type.upper().strip()} {quantity} shares of {ticker.upper().strip()} at ${response.execution_price:.2f}"
-            updated_user = db.query(User).filter(User.id == user_id).first() # Query db again for user with new details
-            # Get transactions history
-            updated_transactions = db.query(
-                Transaction
-                ).filter(Transaction.user_id == user_id).order_by(
-                    Transaction.id.desc()
-                ).all()
             
-            return templates.TemplateResponse(
-                request=request,
-                name="dashboard.html",
-                context={
-                    "user": updated_user,
-                    "success": feedback_msg,
-                    "transactions": updated_transactions # Send updated history to template
-                }
-            )
+            redir_response = RedirectResponse(url="/dashboard", status_code=303)
+            redir_response.set_cookie(key="success_msg", value=feedback_msg, max_age=10)
+            return redir_response
         else:
-            # Get transactions history
-            current_transactions = db.query(
-                Transaction
-                ).filter(Transaction.user_id == user_id).order_by(
-                    Transaction.id.desc()
-                ).all()
-            
-            return templates.TemplateResponse(
-                request=request,
-                name="dashboard.html",
-                context={
-                    "user": current_user,
-                    "transactions": current_transactions,
-                    "error": response.message                    
-                }
-            )
+            feedback_msg = response.message
+            redir_response = RedirectResponse(url="/dashboard", status_code=303)
+            redir_response.set_cookie(key="error_msg", value=feedback_msg, max_age=10)
+            return redir_response
     except jwt.PyJWTError:
         return RedirectResponse(url="/login", status_code=303)
     
     except grpc.RpcError as error:
         # Gracefullt catch connection errrs from gRPC trading engine
-        return templates.TemplateResponse(
-            request=request,
-            name="dashboard.html",
-            context={
-                "user": current_user,
-                "error": f"Main transaction engne connection failure: {error.details()}"
-            }
-        )
+        feedback_msg =  f"Main transaction engne connection failure: {error.details()}"
+        redir_response = RedirectResponse(url="/dashboard", status_code=303)
+        redir_response.set_cookie(key="error_msg", value=feedback_msg, max_age=10)
+        return redir_response
 
 
 # Routes for the User Profile ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
