@@ -50,6 +50,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else {
                     priceElement.classList.add("flash-down");
                 }
+                setTimeout(() => {
+                    priceElement.classList.remove("flash-up", "flash-down");
+                }, 1000);
             }
             priceCache[ticker] = newPrice;
         }

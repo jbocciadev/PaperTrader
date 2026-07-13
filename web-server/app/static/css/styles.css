@@ -1,20 +1,37 @@
 /* Visual Flash Animations */
 .price-cell {
     transition:
-        background-color 0.4s ease,
-        color 0.4s ease;
+        background-color 0.8s ease,
+        color 0.8s ease;
     padding: 4px 12px;
     border-radius: 4px;
     display: inline-block;
     font-weight: bold;
+    background-color: transparent !important;
 }
 .flash-up {
-    background-color: rgba(40, 167, 69, 0.25) !important; /* Soft Green Flash */
-    color: #28a745 !important;
+    transition:
+        background-color 0.1s ease,
+        color 0.1s ease !important;
+    background-color: rgba(
+        40,
+        167,
+        69,
+        0.25
+    ) !important; /* Soft Green Background */
+    color: #28a745 !important; /* Clear Green Text */
 }
 .flash-down {
-    background-color: rgba(220, 53, 69, 0.25) !important; /* Soft Red Flash */
-    color: #dc3545 !important;
+    transition:
+        background-color 0.1s ease,
+        color 0.1s ease !important;
+    background-color: rgba(
+        220,
+        53,
+        69,
+        0.25
+    ) !important; /* Soft Red Background */
+    color: #dc3545 !important; /* Clear Red Text */
 }
 @keyframes pulse {
     0% {
