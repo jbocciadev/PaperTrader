@@ -1,34 +1,71 @@
-{% extends "base.html" %} {% block content %}
-    {% if success %}
-        <div class="alert alert-success alert-dismissible fade show text-center mb-4" role="alert">
-            🎉 <strong>Success:</strong> {{ success }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    {% endif %}
-
-    {% if error %}
-        <div class="alert alert-danger alert-dismissible fade show text-center mb-4" role="alert">
-            ❌ <strong>Error:</strong> {{ error }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    {% endif %}
+{% extends "base.html" %} {% block content %} {% if success %}
+<div
+    class="alert alert-success alert-dismissible fade show text-center mb-4"
+    role="alert">
+    🎉 <strong>Success:</strong> {{ success }}
+    <button
+        type="button"
+        class="btn-close"
+        data-bs-dismiss="alert"
+        aria-label="Close"></button>
+</div>
+{% endif %} {% if error %}
+<div
+    class="alert alert-danger alert-dismissible fade show text-center mb-4"
+    role="alert">
+    ❌ <strong>Error:</strong> {{ error }}
+    <button
+        type="button"
+        class="btn-close"
+        data-bs-dismiss="alert"
+        aria-label="Close"></button>
+</div>
+{% endif %}
 <div class="row">
     <!-- LEFT PANEL: Portfolio Summary & Execution Form -->
     <div class="col-md-5">
-        <!-- Cash Balance Display Card -->
+        <!-- Current Position Display Card -->
         <div class="card shadow-sm mb-4">
-            <div class="card-body bg-dark text-white text-center rounded-top">
-                <h6 class="text-uppercase text-muted small mb-1">
-                    Available Capital
+            <div class="card-header bg-dark text-white text-center py-3">
+                <h6 class="text-uppercase text-muted small mb-1 font-monospace">
+                    Account Holder: {{ user.username }}
                 </h6>
-                <h2 class="mb-0" id="user-cash">
-                    ${{ "%.2f"|format(user.cash_balance) }}
-                </h2>
+                <h5 class="mb-0 text-white">💼 Financial Net Worth Summary</h5>
             </div>
-            <div class="card-footer bg-white text-center">
-                <span class="text-muted"
-                    >Account Holder: <strong>{{ user.username }}</strong></span
-                >
+            <div class="card-body p-0">
+                <!-- Liquid Capital Cash -->
+                <div
+                    class="d-flex justify-content-between align-items-center border-bottom p-3">
+                    <span class="text-muted small text-uppercase fw-bold"
+                        >1. Available Cash Balance</span
+                    >
+                    <span class="fw-bold text-dark h5 mb-0" id="user-cash"
+                        >${{ "%.2f"|format(user.cash_balance) }}</span
+                    >
+                </div>
+                <!-- Row 2: Asset Market Value -->
+                <div
+                    class="d-flex justify-content-between align-items-center border-bottom p-3 bg-light">
+                    <span class="text-muted small text-uppercase fw-bold"
+                        >2. Active Positions Value</span
+                    >
+                    <span
+                        class="fw-bold text-primary h5 mb-0"
+                        id="positions-value"
+                        >${{ "%.2f"|format(holdings_value) }}</span
+                    >
+                </div>
+                <!-- Row 3: Total Consolidated Net Worth -->
+                <div
+                    class="d-flex justify-content-between align-items-center p-3 bg-dark-subtle text-dark">
+                    <span class="text-dark small text-uppercase fw-bold"
+                        >📊 Consolidated Net Worth</span
+                    >
+                    <span class="fw-bold h4 mb-0" id="net-worth"
+                        >${{ "%.2f"|format(user.cash_balance + holdings_value)
+                        }}</span
+                    >
+                </div>
             </div>
         </div>
 
@@ -50,8 +87,7 @@
                             name="ticker"
                             placeholder="e.g. AAPL"
                             required
-                            onkeyup="this.value = this.value.toUpperCase()"
-                        />
+                            onkeyup="this.value = this.value.toUpperCase()" />
                     </div>
 
                     <div class="mb-3">
@@ -64,8 +100,7 @@
                             id="quantity"
                             name="quantity"
                             min="1"
-                            required
-                        />
+                            required />
                     </div>
 
                     <div class="mb-3">
@@ -86,14 +121,11 @@
         </div>
     </div>
 
-    
-
     <!-- RIGHT PANEL: Live Ticker Feed Monitoring Station -->
     <div class="col-md-7">
         <div class="card shadow-sm h-100">
             <div
-                class="card-header bg-success text-white d-flex justify-content-between align-items-center"
-            >
+                class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">📺 Live Market Ticker Streams</h5>
                 <span
                     class="badge bg-white text-success fw-bold"
@@ -103,13 +135,11 @@
             </div>
             <div
                 class="card-body bg-light text-center d-flex flex-column justify-content-center p-5"
-                id="monitor-box"
-            >
+                id="monitor-box">
                 <div id="price-display-panel" style="display: none">
                     <h1
                         class="display-1 fw-bold text-success mb-2"
-                        id="live-price"
-                    >
+                        id="live-price">
                         $0.00
                     </h1>
                     <h3 class="text-muted text-uppercase" id="live-symbol">
@@ -127,63 +157,90 @@
     </div>
 
     <!-- LOWER LAYER CONTAINER: Transaction Ledger Registry Table -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card shadow-sm mb-5">
-            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">📜 Historical Activity Ledger Receipt Register</h5>
-                <span class="badge bg-secondary text-white fw-bold">Audit Trail</span>
-            </div>
-            <div class="card-body p-0">
-                
-                <!-- Jinja2 Conditional Check: Verify if data records are active -->
-                {% if transactions and transactions|length > 0 %}
-                <div class="table-responsive">
-                    <table class="table table-hover table-striped mb-0 text-center align-middle">
-                        <thead class="table-light text-uppercase small font-monospace">
-                            <tr>
-                                <th>Transaction Reference ID</th>
-                                <th>Stock Symbol</th>
-                                <th>Order Type Action</th>
-                                <th>Volume (Shares)</th>
-                                <th>Executed Rate</th>
-                                <th>Total Capital Impact</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Loop systematically across every entry passed from our database query -->
-                            {% for trade in transactions %}
-                            <tr>
-                                <td class="text-muted small">#{{ trade.id }}</td>
-                                <td><span class="badge bg-light text-dark border fw-bold text-uppercase">{{ trade.ticker }}</span></td>
-                                <td>
-                                    {% if trade.transaction_type == 'BUY' %}
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-3">BUY</span>
-                                    {% else %}
-                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3">SELL</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ trade.shares }}</td>
-                                <td class="fw-bold text-secondary">${{ "%.2f"|format(trade.price) }}</td>
-                                <td class="fw-bold {% if trade.transaction_type == 'BUY' %}text-danger{% else %}text-success{% endif %}">
-                                    {% if trade.transaction_type == 'BUY' %}-{% else %}+{% endif %}${{ "%.2f"|format(trade.shares * trade.price) }}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm mb-5">
+                <div
+                    class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        📜 Historical Activity Ledger Receipt Register
+                    </h5>
+                    <span class="badge bg-secondary text-white fw-bold"
+                        >Audit Trail</span
+                    >
                 </div>
-                {% else %}
-                <!-- Fallback presentation template if the table row count returns zero entries -->
-                <div class="text-center p-5">
-                    <p class="text-muted mb-0">No transaction receipts documented in this profile instance. Complete your initial market trade above to initialize the audit ledger track line.</p>
+                <div class="card-body p-0">
+                    <!-- Jinja2 Conditional Check: Verify if data records are active -->
+                    {% if transactions and transactions|length > 0 %}
+                    <div class="table-responsive">
+                        <table
+                            class="table table-hover table-striped mb-0 text-center align-middle">
+                            <thead
+                                class="table-light text-uppercase small font-monospace">
+                                <tr>
+                                    <th>Transaction Reference ID</th>
+                                    <th>Stock Symbol</th>
+                                    <th>Order Type Action</th>
+                                    <th>Volume (Shares)</th>
+                                    <th>Executed Rate</th>
+                                    <th>Total Capital Impact</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Loop systematically across every entry passed from our database query -->
+                                {% for trade in transactions %}
+                                <tr>
+                                    <td class="text-muted small">
+                                        #{{ trade.id }}
+                                    </td>
+                                    <td>
+                                        <span
+                                            class="badge bg-light text-dark border fw-bold text-uppercase"
+                                            >{{ trade.ticker }}</span
+                                        >
+                                    </td>
+                                    <td>
+                                        {% if trade.transaction_type == 'BUY' %}
+                                        <span
+                                            class="badge bg-success-subtle text-success border border-success-subtle px-3"
+                                            >BUY</span
+                                        >
+                                        {% else %}
+                                        <span
+                                            class="badge bg-danger-subtle text-danger border border-danger-subtle px-3"
+                                            >SELL</span
+                                        >
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ trade.shares }}</td>
+                                    <td class="fw-bold text-secondary">
+                                        ${{ "%.2f"|format(trade.price) }}
+                                    </td>
+                                    <td
+                                        class="fw-bold {% if trade.transaction_type == 'BUY' %}text-danger{% else %}text-success{% endif %}">
+                                        {% if trade.transaction_type == 'BUY'
+                                        %}-{% else %}+{% endif %}${{
+                                        "%.2f"|format(trade.shares *
+                                        trade.price) }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <!-- Fallback presentation template if the table row count returns zero entries -->
+                    <div class="text-center p-5">
+                        <p class="text-muted mb-0">
+                            No transaction receipts documented in this profile
+                            instance. Complete your initial market trade above
+                            to initialize the audit ledger track line.
+                        </p>
+                    </div>
+                    {% endif %}
                 </div>
-                {% endif %}
-
             </div>
         </div>
     </div>
-</div>
-
 </div>
 {% endblock %}
