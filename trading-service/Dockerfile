@@ -1,6 +1,8 @@
 # Build and compile dependencies
 FROM python:3.11-slim AS builder
 WORKDIR /build
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \

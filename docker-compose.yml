@@ -11,17 +11,18 @@ market-service:
     environment:
         - NODE_ENV=production
         - TICKERS=${TICKERS}
-        - UPSTASH_REDIT_REST_URL=${UPSTASH_REDIT_REST_URL}
-        - UPSTASH_REDIT_REST_TOKEN=${UPSTASH_REDIT_REST_TOKEN}
+        - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIT_REST_URL}
+        - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIT_REST_TOKEN}
         - FINNHUB_API_KEY=${FINNHUB_API_KEY}
         - NODE_TLS_REJECT_UNAUTHORIZED=0
     networks:
         - paper-trader-overlay
-    deploy:
-        restart_policy:
-            condition: on-failure
-            delay: 5s
-            max_attempts: 3
+    restart: on-failure
+    # deploy:
+    #     restart_policy:
+    #         condition: on-failure
+    #         delay: 5s
+    #         max_attempts: 3
 
 # Trade execution layer
 
@@ -35,9 +36,10 @@ trading-service:
         - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
     networks:
         - paper-trader-overlay
-    deploy:
-        restart_policy:
-            condition: on-failure
+    restart: on-failure
+    # deploy:
+    #     restart_policy:
+    #         condition: on-failure
 
 # FastAPI Web Server (GUI)
 
@@ -45,7 +47,8 @@ web-server:
     build:
         context: "./FastAPI Web Server"
         dockerfile: Dockerfile
-    ports: -"8000:8000"
+    ports:
+        - "8000:8000"
     environment:
         - JWT_SECRET=${JWT_SECRET}
         - JWT_ALGORITHM=${JWT_ALGORITHM}
@@ -54,15 +57,19 @@ web-server:
         - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
         - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
         - TRADING_SERVICE_URL=trading-service:50051
-    networks: -paper-trader-overlay
-    depends_on: -trading-service
-    deploy:
-        restart_policy:
-            condition: on-failure
+    networks:
+        - paper-trader-overlay
+    depends_on:
+        - trading-service
+    restart: on-failure
+    # deploy:
+    #     restart_policy:
+    #         condition: on-failure
 
 # Network definition
 
 networks:
     paper-trader-overlay:
-        driver: overlay
+        driver: bridge
+        # driver: overlay
         attachable: true

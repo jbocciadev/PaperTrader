@@ -4,7 +4,8 @@ WORKDIR /workspace
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
+# RUN npm ci --only=production
 
 # Runtime environment
 FROM node:20-alpine as runner
@@ -16,6 +17,9 @@ COPY . .
 
 # Environment setup
 ENV NODE_ENV=production
+
+# Expose port
+EXPOSE 50052
 
 # Start app
 CMD ["node", "app.js"]
