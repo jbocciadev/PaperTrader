@@ -47,7 +47,9 @@ async def lifespan(app:FastAPI):
 
     # Establish gRPC channel
     # Reference: https://realpython.com/python-microservices-grpc/
-    channel = grpc.insecure_channel(os.environ.get("TRADING_SERVICE_URL", "localhost:50051"))
+    # Insecure channel maintained as all services inside the same 
+    # docker container and port not exposed
+    channel = grpc.aio.insecure_channel(os.environ.get("TRADING_SERVICE_URL", "localhost:50051"))
 
     grpc_client["stub"] = engine_pb2_grpc.TradingServiceStub(channel)
     print("gRPC client channel established successfully.")
@@ -415,7 +417,7 @@ class TradeRequestModel(BaseModel):
 
 # FastAPI Reference for Forms https://fastapi.tiangolo.com/tutorial/request-forms/
 @app.post("/trade")
-def handle_trade_route(
+async def handle_trade_route(
     request: Request,
     ticker: str = Form(...),
     quantity: int = Form(...),
@@ -465,7 +467,7 @@ def handle_trade_route(
         )
 
         # Send the request using the stub generated in the context manager
-        response = grpc_client["stub"].ExecuteTrade(proto_request, timeout=5)
+        response = await grpc_client["stub"].ExecuteTrade(proto_request, timeout=5)
 
         # Redirect user to dashboard with success or error message
         # Use session cookies to flash messages
