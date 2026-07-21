@@ -12,6 +12,10 @@ from sqlalchemy import func
 from dotenv import load_dotenv
 from upstash_redis import Redis
 
+from grpc_health.v1 import health
+from grpc_health.v1 import health_pb2
+from grpc_health.v1 import health_pb2_grpc
+
 from database import SessionLocal
 
 class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
@@ -20,9 +24,8 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
     Inherits from the compiled gRPC base class
     """
 
-    def __init__(self, redis_client, db_session=None): # Default to None to allow for prod/test start
+    def __init__(self, redis_client):
         self.redis_client = redis_client
-        self.db_session = db_session
 
     def ExecuteTrade(self, request, context):
         """ 
@@ -30,13 +33,8 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
         and executes the transaction requested.
         """
 
-        # Check if a mock db has been passed
-        is_test_environment = self.db_session is not None 
-        if is_test_environment:
-            db = self.db_session
-        else:
-            db = SessionLocal()
-
+        # Create database session to handle transaction
+        db = SessionLocal()
 
         # Check against invalid number of shares
         if request.quantity <= 0:
@@ -48,22 +46,18 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
             )
         
         # If production, query DB for actual user
-        if not is_test_environment:
-            # Query db for user record
-            user_record = db.query(User).filter(User.id == request.user_id).first()
-            # Validate user
-            if user_record is None:
-                return engine_pb2.TradeResponse(
-                    success=False,
-                    message="Aborted. User not found in database.",
-                    transaction_id="",
-                    execution_price=0.0
-                )
-            
-            user_cash = user_record.cash_balance
-        else:
-            # Mock funds for testing, will be queried from DB
-            user_cash = 10000.00
+        # Query db for user record
+        user_record = db.query(User).filter(User.id == request.user_id).first()
+        # Validate user
+        if user_record is None:
+            return engine_pb2.TradeResponse(
+                success=False,
+                message="Aborted. User not found in database.",
+                transaction_id="",
+                execution_price=0.0
+            )
+        
+        user_cash = user_record.cash_balance
 
         # Implement BUY transaction type
         if request.trade_type == engine_pb2.BUY:
@@ -77,33 +71,31 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                 )
 
                 # Update db for user if order succeeds
-                if not is_test_environment:
-                    user_record.cash_balance = new_balance
+                user_record.cash_balance = new_balance
 
-                    # Store transaction in db
-                    new_transaction = Transaction(
-                        user_id=request.user_id,
-                        shares=request.quantity,
-                        ticker=request.ticker,
-                        price=cached_price,
-                        transaction_type="BUY"
-                    )
-                    db.add(new_transaction)
+                # Store transaction in db
+                new_transaction = Transaction(
+                    user_id=request.user_id,
+                    shares=request.quantity,
+                    ticker=request.ticker,
+                    price=cached_price,
+                    transaction_type="BUY"
+                )
+                db.add(new_transaction)
 
-                    # Commit both updates to the db
-                    db.commit()
+                # Commit both updates to the db
+                db.commit()
 
                 return engine_pb2.TradeResponse(
                     success=True,
                     message=f"Successfully purchased {request.quantity} shares of {request.ticker}.",
-                    transaction_id="tx_generated_123",
+                    transaction_id=str(new_transaction.id),
                     execution_price=cached_price
                 )
             
             except ValueError as error:
                 # Catch insufficient funds/price unavailable errors
-                if not is_test_environment:
-                    db.rollback()  # Undo any changes in case of error
+                db.rollback()  # Undo any changes in case of error
 
                 return engine_pb2.TradeResponse(
                     success=False,
@@ -113,54 +105,46 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                 )
             
             except Exception as error:
-                if not is_test_environment:
-                    db.rollback()
+                db.rollback()
                 print(f"[ERROR] Transaction failed, session rolled back: {str(error)}")
-                return engine_pb2.TradeResponse(success=False, message=f"Database execution error: {str(error)}")
+                return engine_pb2.TradeResponse(success=False, message=f"An internal error occurred while processing the transaction.")
             
             finally:
                 # Close the database connections
-                if not is_test_environment:
-                    db.close()
+                db.close()
 
         # Implement Sell transaction type
         elif request.trade_type == engine_pb2.SELL:
             try:
                 # Retrieve user record from db
-                if not is_test_environment:
-                    user_record = db.query(User).filter(User.id == request.user_id).first()
-                    # Return failure if user not found
-                    if user_record is None:
-                        return engine_pb2.TradeResponse(
-                            success=False,
-                            message="Aborted, user not found.",
-                            transaction_id="",
-                            execution_price=0.0
-                        )
+                user_record = db.query(User).filter(User.id == request.user_id).first()
+                # Return failure if user not found
+                if user_record is None:
+                    return engine_pb2.TradeResponse(
+                        success=False,
+                        message="Aborted, user not found.",
+                        transaction_id="",
+                        execution_price=0.0
+                    )
 
-                    user_cash = user_record.cash_balance
+                user_cash = user_record.cash_balance
 
-                    # Calculate current total of shares owned by the user 
-                    # by adding BUY transactions and subtracting SELL transactions
-                    bought_shares = db.query(func.sum(Transaction.shares)).filter(
-                        Transaction.user_id == request.user_id,
-                        Transaction.ticker == request.ticker,
-                        Transaction.transaction_type == "BUY"
-                    ).scalar() or 0
+                # Calculate current total of shares owned by the user 
+                # by adding BUY transactions and subtracting SELL transactions
+                bought_shares = db.query(func.sum(Transaction.shares)).filter(
+                    Transaction.user_id == request.user_id,
+                    Transaction.ticker == request.ticker,
+                    Transaction.transaction_type == "BUY"
+                ).scalar() or 0
 
-                    sold_shares = db.query(func.sum(Transaction.shares)).filter(
-                        Transaction.user_id == request.user_id,
-                        Transaction.ticker == request.ticker,
-                        Transaction.transaction_type == "SELL"
-                    ).scalar() or 0
+                sold_shares = db.query(func.sum(Transaction.shares)).filter(
+                    Transaction.user_id == request.user_id,
+                    Transaction.ticker == request.ticker,
+                    Transaction.transaction_type == "SELL"
+                ).scalar() or 0
 
-                    user_held_shares = bought_shares - sold_shares
-                
-                else:
-                    # Fallback values for testing scenarios
-                    user_cash = 10000.0
-                    user_held_shares = 50
-
+                user_held_shares = bought_shares - sold_shares
+            
                 # Execute transaction
                 new_balance, total_proceeds, cached_price = engine.execute_sell_order(
                     redis_client=self.redis_client,
@@ -171,26 +155,25 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
                 )
 
                 # Update db for user record if transaction succeeds
-                if not is_test_environment:
-                    user_record.cash_balance = new_balance
+                user_record.cash_balance = new_balance
 
-                    # Store transaction in db
-                    new_transaction = Transaction(
-                        user_id=request.user_id,
-                        shares=request.quantity,
-                        ticker=request.ticker,
-                        price=cached_price,
-                        transaction_type="SELL"
-                    )
-                    db.add(new_transaction)
+                # Store transaction in db
+                new_transaction = Transaction(
+                    user_id=request.user_id,
+                    shares=request.quantity,
+                    ticker=request.ticker,
+                    price=cached_price,
+                    transaction_type="SELL"
+                )
+                db.add(new_transaction)
 
-                    # Commit both additions to the database
-                    db.commit()
+                # Commit both additions to the database
+                db.commit()
 
                 return engine_pb2.TradeResponse(
                     success=True,
                     message=f"Successfully sold {request.quantity} shares of {request.ticker}.",
-                    transaction_id="tx_generated_sell",  # Placeholder until UUID or auto-inc tracking is hooked up
+                    transaction_id=str(new_transaction.id),
                     execution_price=cached_price
                 )
 
@@ -206,19 +189,18 @@ class TradingServiceServicer(engine_pb2_grpc.TradingServiceServicer):
             except Exception as error:
                 db.rollback()
                 print(f"[ERROR] Transaction failed, session rolled back: {str(error)}")
-                return engine_pb2.TradeResponse(success=False, message=f"Database execution error: {str(error)}")
+                return engine_pb2.TradeResponse(success=False, message=f"An internal error occurred while processing the transaction.")
 
             finally:
-                if not is_test_environment:
-                    db.close()
+                db.close()
 
         # Fallback return statement
-            return engine_pb2.TradeResponse(
-                success=False,
-                message="Unsupported transaction type specified.",
-                transaction_id="",
-                execution_price=0.0
-            )
+        return engine_pb2.TradeResponse(
+            success=False,
+            message="Unsupported transaction type specified.",
+            transaction_id="",
+            execution_price=0.0
+        )
 
     
     def GetPortfolio(self, request, context):
@@ -251,10 +233,22 @@ def serve():
     redis_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
     redis_client = Redis(url=redis_url, token=redis_token)
 
-    db_session = SessionLocal()
-    
     # Open a standard background thread pool to handle concurrent trades
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+
+    # Register standard gRPC health checking service
+    health_servicer = health.HealthServicer()
+
+    health_pb2_grpc.add_HealthServicer_to_server(
+        health_servicer,
+        server
+    )
+
+    # Mark the overall gRPC server as healthy
+    health_servicer.set(
+        "",
+        health_pb2.HealthCheckResponse.SERVING
+    )
     
     # Register business logic class directly to the running network server
     # Pass a placeholder initialization instance matching class signature.
@@ -265,6 +259,8 @@ def serve():
     )
     
     # Securely lock the server to handle internal insecure communication on port 50051
+    # Insecure channel maintained as all services inside the same 
+    # docker container and port not exposed
     server.add_insecure_port("[::]:50051")
     print("\n---------------------------------------------------------")
     print("🚀 SUCCESS: gRPC Core Trading Server is active on port 50051!")
