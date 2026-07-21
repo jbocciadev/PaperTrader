@@ -8,18 +8,13 @@ services:
         environment:
             - NODE_ENV=production
             - TICKERS=${TICKERS}
+            - REDIS_URL=${REDIS_URL}
             - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
             - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
             - FINNHUB_API_KEY=${FINNHUB_API_KEY}
-            - NODE_TLS_REJECT_UNAUTHORIZED=0
         networks:
             - paper-trader-overlay
-        restart: on-failure
-        # deploy:
-        #     restart_policy:
-        #         condition: on-failure
-        #         delay: 5s
-        #         max_attempts: 3
+        restart: unless-stopped
 
     # Trade execution layer
 
@@ -33,10 +28,7 @@ services:
             - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
         networks:
             - paper-trader-overlay
-        restart: on-failure
-        # deploy:
-        #     restart_policy:
-        #         condition: on-failure
+        restart: unless-stopped
 
     # FastAPI Web Server (GUI)
 
@@ -58,15 +50,11 @@ services:
             - paper-trader-overlay
         depends_on:
             - trading-service
-        restart: on-failure
-        # deploy:
-        #     restart_policy:
-        #         condition: on-failure
+        restart: unless-stopped
 
     # Network definition
 
 networks:
     paper-trader-overlay:
         driver: bridge
-        # driver: overlay
         attachable: true
