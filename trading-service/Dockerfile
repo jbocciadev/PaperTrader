@@ -16,12 +16,19 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir=/build/wheels -r requirements
 FROM python:3.11-slim AS runner
 WORKDIR /app
 
+# If wheels used, copy:
 COPY --from=builder /build/wheels /wheels
+
 COPY --from=builder /build/requirements.txt .
 
 # Install dependencies
+
+# If wheels used, run:
 RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt \
     && rm -rf /wheels
+
+# If wheels not used, run:
+# RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app
 COPY main.py .

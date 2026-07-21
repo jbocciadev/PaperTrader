@@ -8,7 +8,7 @@ RUN npm ci --omit=dev
 # RUN npm ci --only=production
 
 # Runtime environment
-FROM node:20-alpine as runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Copy package files

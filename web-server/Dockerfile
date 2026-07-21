@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
+
 # Compile wheels to local
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir=/build/wheels -r requirements.txt
 
@@ -18,8 +19,13 @@ COPY --from=builder /build/wheels /wheels
 COPY --from=builder /build/requirements.txt .
 
 # Install dependencies
+# If wheels used, run:
 RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt \
     && rm -rf /wheels
+
+# If wheels not used, run:
+    # RUN pip install --no-cache-dir -r requirements.txt
+
 
 COPY app/ ./app
 
