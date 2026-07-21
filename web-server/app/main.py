@@ -47,7 +47,7 @@ async def lifespan(app:FastAPI):
 
     # Establish gRPC channel
     # Reference: https://realpython.com/python-microservices-grpc/
-    channel = grpc.insecure_channel("localhost:50051")
+    channel = grpc.insecure_channel(os.environ.get("TRADING_SERVICE_URL", "localhost:50051"))
 
     grpc_client["stub"] = engine_pb2_grpc.TradingServiceStub(channel)
     print("gRPC client channel established successfully.")

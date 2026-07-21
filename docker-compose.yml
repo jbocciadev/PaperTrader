@@ -1,0 +1,60 @@
+services:
+    # Market data ingestion layer
+
+    market-service:
+        build:
+            context: "./market-service"
+            dockerfile: Dockerfile
+        environment:
+            - NODE_ENV=production
+            - TICKERS=${TICKERS}
+            - REDIS_URL=${REDIS_URL}
+            - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+            - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
+            - FINNHUB_API_KEY=${FINNHUB_API_KEY}
+        networks:
+            - paper-trader-overlay
+        restart: unless-stopped
+
+    # Trade execution layer
+
+    trading-service:
+        build:
+            context: "./trading-service"
+            dockerfile: Dockerfile
+        environment:
+            - DATABASE_URL=${DATABASE_URL}
+            - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+            - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
+        networks:
+            - paper-trader-overlay
+        restart: unless-stopped
+
+    # FastAPI Web Server (GUI)
+
+    web-server:
+        build:
+            context: "./web-server"
+            dockerfile: Dockerfile
+        ports:
+            - "8000:8000"
+        environment:
+            - JWT_SECRET=${JWT_SECRET}
+            - JWT_ALGORITHM=${JWT_ALGORITHM}
+            - TICKERS=${TICKERS}
+            - DATABASE_URL=${DATABASE_URL}
+            - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+            - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
+            - TRADING_SERVICE_URL=trading-service:50051
+        networks:
+            - paper-trader-overlay
+        depends_on:
+            - trading-service
+        restart: unless-stopped
+
+    # Network definition
+
+networks:
+    paper-trader-overlay:
+        driver: bridge
+        attachable: true
