@@ -13,10 +13,31 @@ const redisClient = createClient({
     url: process.env.REDIS_URL,
     socket: {
         connectTimeout: 10000, // Wait max 10 seconds to connect
-        keepAlive: 5000, // Check connection is alive by pinging the server every 5 seconds
+        keepAlive: 30000, // Keep TCP connection alive (pinging)
+        // Establish reconnections policy
+        reconnectStrategy: (retries) => {
+            console.log(`Redis reconnect attempt #${retries}`);
+            return Math.min(retries * 100, 3000); // Backoff retry delay
+        },
     },
 });
 redisClient.on("error", (err) => console.error("Redis client error: ", err));
+
+redisClient.on("connect", () => {
+    console.log("[REDIS] Connecting to Redis server...");
+});
+
+redisClient.on("ready", () => {
+    console.log("[REDIS] Redis connection ready.");
+});
+
+redisClient.on("reconnecting", () => {
+    console.log("[REDIS] Attempting to reconnect to Redis...");
+});
+
+redisClient.on("end", () => {
+    console.warn("[REDIS] Redis connection closed.");
+});
 
 // Finnhub API client setup
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -55,13 +76,6 @@ async function openingPrices() {
             await redisClient.set(redisKey, JSON.stringify(result.data));
         }
 
-        // for (let ticker of tickers) {
-        //     // Source: https://finnhub.io/docs/api/quote => see cURL path
-        //     const url = `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_API_KEY}`;
-        //     const response = await axios.get(url);
-
-        //     openingValues[ticker] = response.data;
-        // }
         console.log("responses: \n\n", openingValues);
     } catch (error) {
         console.error("Error fetching initial ticker prices.", error.message);
@@ -69,63 +83,125 @@ async function openingPrices() {
 }
 
 // Function to connect to finnhub's websocket and actions to take
+// Track the active Finnhub WebSocket connection
+let finnhubSocket = null;
+
+// Prevent multiple reconnect timers from being created
+let reconnectTimer = null;
+
+// Function to connect to Finnhub's WebSocket
 async function startWebsocket() {
-    const socket = new WebSocket(
-        `wss://ws.finnhub.io?token=${FINNHUB_API_KEY}`,
+    // Prevent duplicate connections
+    if (
+        finnhubSocket &&
+        (finnhubSocket.readyState === WebSocket.OPEN ||
+            finnhubSocket.readyState === WebSocket.CONNECTING)
+    ) {
+        console.log("Finnhub WebSocket is already connected or connecting.");
+        return;
+    }
+
+    console.log("Connecting to Finnhub WebSocket...");
+
+    finnhubSocket = new WebSocket(
+        `wss://ws.finnhub.io?token=${FINNHUB_API_KEY}`
     );
 
-    // Handle initial opening of the websocket
-    socket.on("open", function (event) {
-        // loop through tickers list and send a subscribe request to the finnhub ws server
+    // Handle successful WebSocket connection
+    finnhubSocket.on("open", function () {
+        console.log("Connected to Finnhub WebSocket.");
+
+        // Clear any pending reconnect timer
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+
+        // Subscribe to all configured tickers
         for (const ticker of tickers) {
-            socket.send(JSON.stringify({ type: "subscribe", symbol: ticker }));
+            finnhubSocket.send(
+                JSON.stringify({
+                    type: "subscribe",
+                    symbol: ticker,
+                })
+            );
+
+            console.log(`Subscribed to Finnhub ticker: ${ticker}`);
         }
     });
 
-    // Handle websockt messages
-    socket.on("message", async function (data) {
+    // Handle WebSocket messages
+    finnhubSocket.on("message", async function (data) {
         try {
-            // Parse the data inside the message received
+            // Parse the message received from Finnhub
             const payload = JSON.parse(data.toString());
-            // Check for ping messages and ignore
-            if (payload.type == "ping") {
+
+            // Ignore Finnhub heartbeat messages
+            if (payload.type === "ping") {
                 return;
-                // console.log("ping msg");
             }
 
-            // Check if message is real trade from market and process
-            if (payload.type == "trade" && payload.data) {
+            // Process real market trade data
+            if (payload.type === "trade" && payload.data) {
                 for (const item of payload.data) {
                     const ticker = item.s;
                     const latestPrice = item.p;
 
-                    // Send info to Redis cloud server
+                    // Redis key for the latest live price
                     const redisPriceKey = `stock:${ticker}:price`;
-                    await redisClient.set(
-                        redisPriceKey,
-                        latestPrice.toString(),
-                    );
-                    console.log(
-                        `Last price update ---> ${ticker}: $ ${latestPrice}`,
-                    );
+
+                    try {
+                        // Store latest market price in Redis
+                        await redisClient.set(
+                            redisPriceKey,
+                            latestPrice.toString()
+                        );
+
+                        console.log(
+                            `Last price update ---> ${ticker}: $ ${latestPrice}`
+                        );
+                    } catch (redisError) {
+                        // Handle Redis failures without crashing
+                        // the Finnhub WebSocket message handler
+                        console.error(
+                            `[REDIS WRITE ERROR] Failed to update ${ticker}:`,
+                            redisError.message
+                        );
+                    }
                 }
             }
         } catch (error) {
-            console.error("Error parsing Websocket message: ", error.message);
+            console.error("Error parsing WebSocket message:", error.message);
         }
     });
 
-    // Handle errors from websocket
-    socket.on("error", function (error) {
-        console.error(`Websocket error received: `, error.message);
+    // Handle WebSocket errors
+    finnhubSocket.on("error", function (error) {
+        console.error("[FINNHUB WEBSOCKET ERROR]:", error.message);
     });
 
-    // Handle remote closure of websocker
-    socket.on("close", function () {
-        console.warn(
-            "Websocket disconnected. Will attempt reconnect in 5 seconds",
-        );
-        setTimeout(startWebsocket, 5000);
+    // Handle remote WebSocket closure
+    finnhubSocket.on("close", function (code, reason) {
+        console.warn(`Finnhub WebSocket disconnected. Code: ${code}.`);
+
+        if (reason) {
+            console.warn(`Disconnect reason: ${reason.toString()}`);
+        }
+
+        // Clear the reference to the closed socket
+        finnhubSocket = null;
+
+        // Prevent duplicate reconnect timers
+        if (!reconnectTimer) {
+            console.log(
+                "Finnhub WebSocket will attempt to reconnect in 5 seconds..."
+            );
+
+            reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
+                startWebsocket();
+            }, 5000);
+        }
     });
 }
 
