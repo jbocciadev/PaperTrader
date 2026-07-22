@@ -164,6 +164,10 @@ async function startWebsocket() {
                     const redisPriceKey = `stock:${ticker}:price`;
 
                     try {
+                        // ==================> Log status for each write
+                        console.log(
+                            `[REDIS STATUS] Connected: ${redisClient.isReady}, Open: ${redisClient.isOpen}`
+                        );
                         // Store latest market price in Redis
                         await redisClient.set(
                             redisPriceKey,
