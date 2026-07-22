@@ -76,13 +76,6 @@ async function openingPrices() {
             await redisClient.set(redisKey, JSON.stringify(result.data));
         }
 
-        // for (let ticker of tickers) {
-        //     // Source: https://finnhub.io/docs/api/quote => see cURL path
-        //     const url = `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_API_KEY}`;
-        //     const response = await axios.get(url);
-
-        //     openingValues[ticker] = response.data;
-        // }
         console.log("responses: \n\n", openingValues);
     } catch (error) {
         console.error("Error fetching initial ticker prices.", error.message);
@@ -137,12 +130,6 @@ async function startWebsocket() {
         }
     });
 
-    // =====================================>
-    setTimeout(() => {
-        console.log("[TEST] Forcing Finnhub WebSocket disconnect...");
-        finnhubSocket.close();
-    }, 30000);
-
     // Handle WebSocket messages
     finnhubSocket.on("message", async function (data) {
         try {
@@ -164,10 +151,6 @@ async function startWebsocket() {
                     const redisPriceKey = `stock:${ticker}:price`;
 
                     try {
-                        // ==================> Log status for each write
-                        console.log(
-                            `[REDIS STATUS] Connected: ${redisClient.isReady}, Open: ${redisClient.isOpen}`
-                        );
                         // Store latest market price in Redis
                         await redisClient.set(
                             redisPriceKey,
@@ -221,66 +204,6 @@ async function startWebsocket() {
         }
     });
 }
-
-// async function startWebsocket() {
-//     const socket = new WebSocket(
-//         `wss://ws.finnhub.io?token=${FINNHUB_API_KEY}`
-//     );
-
-//     // Handle initial opening of the websocket
-//     socket.on("open", function (event) {
-//         // loop through tickers list and send a subscribe request to the finnhub ws server
-//         for (const ticker of tickers) {
-//             socket.send(JSON.stringify({ type: "subscribe", symbol: ticker }));
-//         }
-//     });
-
-//     // Handle websockt messages
-//     socket.on("message", async function (data) {
-//         try {
-//             // Parse the data inside the message received
-//             const payload = JSON.parse(data.toString());
-//             // Check for ping messages and ignore
-//             if (payload.type == "ping") {
-//                 return;
-//                 // console.log("ping msg");
-//             }
-
-//             // Check if message is real trade from market and process
-//             if (payload.type == "trade" && payload.data) {
-//                 for (const item of payload.data) {
-//                     const ticker = item.s;
-//                     const latestPrice = item.p;
-
-//                     // Send info to Redis cloud server
-//                     const redisPriceKey = `stock:${ticker}:price`;
-//                     await redisClient.set(
-//                         redisPriceKey,
-//                         latestPrice.toString()
-//                     );
-//                     console.log(
-//                         `Last price update ---> ${ticker}: $ ${latestPrice}`
-//                     );
-//                 }
-//             }
-//         } catch (error) {
-//             console.error("Error parsing Websocket message: ", error.message);
-//         }
-//     });
-
-//     // Handle errors from websocket
-//     socket.on("error", function (error) {
-//         console.error(`Websocket error received: `, error.message);
-//     });
-
-//     // Handle remote closure of websocker
-//     socket.on("close", function () {
-//         console.warn(
-//             "Websocket disconnected. Will attempt reconnect in 5 seconds"
-//         );
-//         setTimeout(startWebsocket, 5000);
-//     });
-// }
 
 async function startApp() {
     // Connect to the redis service
