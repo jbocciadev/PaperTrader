@@ -137,6 +137,12 @@ async function startWebsocket() {
         }
     });
 
+    // =====================================>
+    setTimeout(() => {
+        console.log("[TEST] Forcing Finnhub WebSocket disconnect...");
+        finnhubSocket.close();
+    }, 30000);
+
     // Handle WebSocket messages
     finnhubSocket.on("message", async function (data) {
         try {
