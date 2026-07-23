@@ -48,6 +48,15 @@ const tickers = process.env.TICKERS.split(",");
 // Declare empty object that will capture all ther eturned values
 const openingValues = {};
 
+// Track the latest market price received for each ticker in memory
+const latestPrices = {};
+
+// Track the last price written to Redis for each ticker
+const lastRedisPrices = {};
+
+// Track the timestamp of the last Redis write for each ticker
+const lastRedisWriteTimes = {};
+
 async function openingPrices() {
     try {
         console.log("polling prices...");
@@ -141,32 +150,53 @@ async function startWebsocket() {
                 return;
             }
 
-            // Process real market trade data
+            // Process real market trade data only, ignore other event types
             if (payload.type === "trade" && payload.data) {
                 for (const item of payload.data) {
                     const ticker = item.s;
                     const latestPrice = item.p;
 
-                    // Redis key for the latest live price
-                    const redisPriceKey = `stock:${ticker}:price`;
+                    // Store the latest price in memory
+                    latestPrices[ticker] = latestPrice;
 
-                    try {
-                        // Store latest market price in Redis
-                        await redisClient.set(
-                            redisPriceKey,
-                            latestPrice.toString()
-                        );
+                    // Check when this ticker was last written to Redis
+                    const now = Date.now();
+                    const lastWriteTime = lastRedisWriteTimes[ticker] || 0;
 
-                        console.log(
-                            `Last price update ---> ${ticker}: $ ${latestPrice}`
-                        );
-                    } catch (redisError) {
-                        // Handle Redis failures without crashing
-                        // the Finnhub WebSocket message handler
-                        console.error(
-                            `[REDIS WRITE ERROR] Failed to update ${ticker}:`,
-                            redisError.message
-                        );
+                    // Check whether the price has actually changed
+                    const priceChanged =
+                        lastRedisPrices[ticker] !== latestPrice;
+
+                    // Limit Redis writes to once every two seconds per ticker
+                    const elapsedTime = now - lastWriteTime >= 2000;
+
+                    // Only write to Redis if:
+                    // 1. The price has changed, and
+                    // 2. At least two seconds have passed since the last write
+                    if (priceChanged && elapsedTime) {
+                        const redisPriceKey = `stock:${ticker}:price`;
+
+                        try {
+                            await redisClient.set(
+                                redisPriceKey,
+                                latestPrice.toString()
+                            );
+
+                            // Record the successful Redis write
+                            lastRedisPrices[ticker] = latestPrice;
+                            lastRedisWriteTimes[ticker] = now;
+
+                            console.log(
+                                `Redis price update ---> ${ticker}: $ ${latestPrice}`
+                            );
+                        } catch (redisError) {
+                            // Handle Redis failures without crashing
+                            // the Finnhub WebSocket message handler
+                            console.error(
+                                `[REDIS WRITE ERROR] Failed to update ${ticker}:`,
+                                redisError.message
+                            );
+                        }
                     }
                 }
             }
