@@ -3,7 +3,6 @@ import asyncio
 import grpc
 import jwt
 import json
-import random
 
 # gRPC stubs
 from app import engine_pb2
@@ -54,10 +53,26 @@ async def lifespan(app:FastAPI):
     grpc_client["stub"] = engine_pb2_grpc.TradingServiceStub(channel)
     print("gRPC client channel established successfully.")
 
+    # Start a single background task responsible for polling
+    # Redis and maintaining the shared market data cache.
+    market_data_task = asyncio.create_task(
+        update_market_data_cache()
+    )
+
+    print("Market data cache background task started.")
+
     yield
 
-    # Cleanup connection on server shutdown
-    channel.close()
+    # Stop the market data background task
+    market_data_task.cancel()
+
+    try:
+        await market_data_task
+    except asyncio.CancelledError:
+        print("Market data cache background task terminated.")
+
+    # Cleanup gRPC connection on server shutdown
+    await channel.close()
     print("gRPC client channel terminated successfully.")
 
 # Initialize app from FastAPI class
@@ -80,57 +95,127 @@ redis_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
 # Start Redis client from imported class
 redis_client = Redis(url=redis_url, token=redis_token)
 
+# Shared in-memory market data cache.
+# shared with all connected browser WebSocket clients.
+market_data_cache = {}
 
-# Reference: https://realpython.com/async-io-python/
+# Event used to notify connected WebSocket clients
+# when new market data is available.
+market_data_updated = asyncio.Event()
 
-@app.websocket("/ws/market-feed")
-async def websocket_market_feed_stream(websocket: WebSocket):
-    # Websocket route that will stream price updates to the front end from the redis db
-    await websocket.accept()
-    
-    try:
-        while True:
-            market_matrix_payload = {}
-            
+
+async def update_market_data_cache():
+    """
+    Polls Redis once every 2 seconds and updates the shared
+    in-memory market data cache.
+
+    This runs once for the entire web server, regardless
+    of how many browsers are connected.
+    """
+
+    global market_data_cache
+
+    while True:
+        try:
+            new_market_data = {}
+
             for ticker in TICKERS_LIST:
                 live_key = f"stock:{ticker}:price"
                 snap_key = f"stock:{ticker}:snapshot"
-                
-                # Fetch cache instances from Upstash Redis
+
+                # Fetch current live price and opening snapshot
                 live_price_raw = redis_client.get(live_key)
                 snapshot_raw = redis_client.get(snap_key)
-                
-                # Default data structure model matching Finnhub schemas
-                ticker_data = {"price": 0.0, "open": 0.0, "change": 0.0, "pct_change": 0.0}
-                
+
+                # Default data structure matching Finnhub schema
+                ticker_data = {
+                    "price": 0.0,
+                    "open": 0.0,
+                    "change": 0.0,
+                    "pct_change": 0.0
+                }
+
+                # Process snapshot data
                 if snapshot_raw:
                     try:
                         snap_json = json.loads(snapshot_raw)
-                        # Extract metrics explicitly out of your snapshot JSON profile
-                        ticker_data["open"] = float(snap_json.get("o", 0.0))
-                        ticker_data["change"] = float(snap_json.get("d", 0.0))
-                        ticker_data["pct_change"] = float(snap_json.get("dp", 0.0))
-                    except Exception:
-                        pass
-                
+
+                        ticker_data["open"] = float(
+                            snap_json.get("o", 0.0)
+                        )
+                        ticker_data["change"] = float(
+                            snap_json.get("d", 0.0)
+                        )
+                        ticker_data["pct_change"] = float(
+                            snap_json.get("dp", 0.0)
+                        )
+
+                        # Use snapshot closing price as fallback
+                        # if there is no live trade price.
+                        if not live_price_raw:
+                            ticker_data["price"] = float(
+                                snap_json.get(
+                                    "c",
+                                    ticker_data["open"]
+                                )
+                            )
+
+                    except Exception as error:
+                        print(
+                            f"[MARKET CACHE] Failed to parse snapshot "
+                            f"for {ticker}: {error}"
+                        )
+
+                # Process live market price
                 if live_price_raw:
                     ticker_data["price"] = float(live_price_raw)
-                elif snapshot_raw and "snap_json" in locals():
-                    # Fallback to the snapshot current/close rate if no live trade is active
-                    ticker_data["price"] = float(snap_json.get("c", ticker_data["open"]))
-                
-                market_matrix_payload[ticker] = ticker_data
-            
-            # Broadcast the updates down to the frontend script to display
-            await websocket.send_json(market_matrix_payload)
-            
-            # Sleep a random interval between 1 and 2 seconds 
-            await asyncio.sleep(random.uniform(1.0, 2.0))
-            
+
+                new_market_data[ticker] = ticker_data
+
+            # Replace the shared cache 
+            market_data_cache = new_market_data
+
+            # Notify WebSocket clients that fresh data is available
+            market_data_updated.set()
+
+        except Exception as error:
+            print(
+                f"[MARKET CACHE ERROR] Failed to update market data: "
+                f"{error}"
+            )
+
+        # Poll Redis every 2 seconds
+        await asyncio.sleep(2)
+
+# Reference: https://realpython.com/async-io-python/
+@app.websocket("/ws/market-feed")
+async def websocket_market_feed_stream(websocket: WebSocket):
+    """
+    Streams the shared in-memory market data cache to the browser.
+    Redis is polled once by the background market-data task.
+    Each browser receives the cached result independently.
+    """
+
+    await websocket.accept()
+
+    print("[WS MARKET FEED] Client connected.")
+
+    try:
+        while True:
+            # Send the latest shared in-memory market data.
+            await websocket.send_json(market_data_cache)
+
+            # Match the Redis polling interval.
+            await asyncio.sleep(2)
+
     except WebSocketDisconnect:
-        print("[WS MARKET FEED] Client browser window session closed cleanly.")
-    except Exception as e:
-        print(f"[WS SERVER ERROR] {e}")
+        print(
+            "[WS MARKET FEED] Client browser window "
+            "session closed cleanly."
+        )
+
+    except Exception as error:
+        print(f"[WS SERVER ERROR] {error}")
 
 @app.websocket("/ws/prices/{ticker}")
 async def websocket_price_stream(websocket: WebSocket, ticker: str):
