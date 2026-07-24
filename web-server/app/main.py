@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends, Form, Cookie
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-from upstash_redis import Redis
+import redis
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -89,11 +89,10 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # Wire-up the Redis server connection
 # Reference: https://upstash.com/docs/redis/tutorials/pythonapi
 
-redis_url = os.getenv("UPSTASH_REDIS_REST_URL")
-redis_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+redis_url = os.getenv("REDIS_URL")
 
 # Start Redis client from imported class
-redis_client = Redis(url=redis_url, token=redis_token)
+redis_client = redis.Redis.from_url(redis_url, decode_responses=True)
 
 # Shared in-memory market data cache.
 # shared with all connected browser WebSocket clients.
