@@ -10,7 +10,7 @@ from app.models import User, Transaction
 from concurrent import futures
 from sqlalchemy import func
 from dotenv import load_dotenv
-from upstash_redis import Redis
+import redis
 
 from grpc_health.v1 import health
 from grpc_health.v1 import health_pb2
@@ -229,9 +229,8 @@ def serve():
     load_dotenv(dotenv_path=shared_env_path)
 
     # Create Redis and PostgreSQL connection clients
-    redis_url = os.getenv("UPSTASH_REDIS_REST_URL")
-    redis_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
-    redis_client = Redis(url=redis_url, token=redis_token)
+    redis_url = os.getenv("REDIS_URL")
+    redis_client = redis.Redis.from_url(redis_url, decode_responses=True)
 
     # Open a standard background thread pool to handle concurrent trades
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

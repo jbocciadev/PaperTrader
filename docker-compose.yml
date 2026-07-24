@@ -9,8 +9,6 @@ services:
             - NODE_ENV=production
             - TICKERS=${TICKERS}
             - REDIS_URL=${REDIS_URL}
-            - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
-            - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
             - FINNHUB_API_KEY=${FINNHUB_API_KEY}
         networks:
             - paper-trader-overlay
@@ -24,8 +22,7 @@ services:
             dockerfile: Dockerfile
         environment:
             - DATABASE_URL=${DATABASE_URL}
-            - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
-            - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
+            - REDIS_URL=${REDIS_URL}
         networks:
             - paper-trader-overlay
         restart: unless-stopped
@@ -43,8 +40,7 @@ services:
             - JWT_ALGORITHM=${JWT_ALGORITHM}
             - TICKERS=${TICKERS}
             - DATABASE_URL=${DATABASE_URL}
-            - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
-            - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
+            - REDIS_URL=${REDIS_URL}
             - TRADING_SERVICE_URL=trading-service:50051
         networks:
             - paper-trader-overlay
