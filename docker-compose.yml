@@ -47,6 +47,7 @@ services:
         depends_on:
             - trading-service
         restart: unless-stopped
+        # Add directory for hot updates on html
 
     # Network definition
 

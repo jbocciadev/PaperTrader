@@ -250,7 +250,9 @@ async def websocket_price_stream(websocket: WebSocket, ticker: str):
 # Web server routes ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
 
 # Reference templates folder to be served
-templates=Jinja2Templates(directory="app/templates")
+templates = Jinja2Templates(directory="app/templates")
+# Hot-loading of changes in html
+templates.env.auto_reload = True
 
 # Define home route
 @app.get("/")
@@ -278,7 +280,7 @@ def home(
 
     return templates.TemplateResponse(
         request=request,
-        name="base.html",
+        name="landing.html",
         context={"user": current_user}
     )
 
