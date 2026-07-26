@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends, Form, Cookie
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from datetime import datetime, timedelta, timezone
 import redis
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
@@ -379,7 +380,8 @@ def process_login(
     
     # If a matching record is found, create the token to be served
     # Reference: https://pyjwt.readthedocs.io/en/stable/usage.html#encoding-decoding-tokens-with-hs256
-    token_payload = {"user_id": user_record.id}
+    token_payload = {"user_id": user_record.id,
+                     "exp": datetime.now(timezone.utc) + timedelta(hours=1)} # Expire session after 1 hour from login
     generated_token = jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
     # Effectively log the user in and rediret them to the dashboard
