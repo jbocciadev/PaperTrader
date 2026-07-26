@@ -9,12 +9,13 @@ from app import engine_pb2
 from app import engine_pb2_grpc
 
 # Hashing library for security purposes
-import hashlib
+import bcrypt
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Depends, Form, Cookie
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from datetime import datetime, timedelta, timezone
 import redis
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
@@ -82,6 +83,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+# Add directory with static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
     
@@ -310,12 +312,15 @@ def process_registration(
         return {"error": "Username already exists. Please choose a different name."}
     
     # Use hash to encrypt the passord
-    hashed_pwd = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    hashed_pwd = bcrypt.hashpw(
+        password.encode("utf-8"),
+        bcrypt.gensalt()
+        ).decode("utf-8")
         
     # Create the new user record profile object (starting with $10,000 cash)
     new_user = User(
         username=username,
-        password_hash=hashed_pwd,  # Storing as a plain text string token for simplicity
+        password_hash=hashed_pwd,  # Storing hashed password in DB.
         cash_balance=10000.00
     )
     
@@ -349,17 +354,22 @@ def process_login(
     Validates the submitted password against the hashed version stored in 
     the PostgreSQL server and inserts a token for the user session
     """
-    # Encrypt the submitted pwd to check against the one in the db
-    incoming_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
 
-    # Query the db for an entry with both username and hashed password
+    # Query the db for an entry with username
     user_record = db.query(User).filter(
-        User.username == username,
-        User.password_hash == incoming_hash
+        User.username == username
     ).first()
 
-    # Return the same page with an error message if credentials don't match
-    if user_record is None:
+    # Verify the submitted password against the stored bcrypt hash.
+    password_valid = (
+        user_record is not None and bcrypt.checkpw(
+            password.encode("utf-8"),
+            user_record.password_hash.encode("utf-8")
+        )
+    )
+
+    # Return the same page with an error message if credentials don't match.
+    if not password_valid:
         return templates.TemplateResponse(
             request=request,
             name="login.html",
@@ -370,7 +380,8 @@ def process_login(
     
     # If a matching record is found, create the token to be served
     # Reference: https://pyjwt.readthedocs.io/en/stable/usage.html#encoding-decoding-tokens-with-hs256
-    token_payload = {"user_id": user_record.id}
+    token_payload = {"user_id": user_record.id,
+                     "exp": datetime.now(timezone.utc) + timedelta(hours=1)} # Expire session after 1 hour from login
     generated_token = jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
     # Effectively log the user in and rediret them to the dashboard
