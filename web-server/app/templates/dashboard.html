@@ -1,276 +1,407 @@
 {% extends "base.html" %} {% block styles %}
-<style src="{{ url_for('static', path='css/flashing-tickers.css') }}"></style>
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', path='css/dashboard.css') }}" />
 <link
     rel="stylesheet"
     href="{{ url_for('static', path='css/flashing-tickers.css') }}" />
-{% endblock %} {% block content %} {% if success %}
-<div
-    class="alert alert-success alert-dismissible fade show text-center mb-4"
-    role="alert">
-    🎉 <strong>Success:</strong> {{ success }}
-    <button
-        type="button"
-        class="btn-close"
-        data-bs-dismiss="alert"
-        aria-label="Close"></button>
+{% endblock %} {% block content %}
+
+<div class="dashboard-page">
+    <!-- =========================================
+         DASHBOARD HEADER
+    ========================================== -->
+
+    <section class="dashboard-header">
+        <div class="container">
+            <div class="dashboard-header-content">
+                <div>
+                    <span class="section-eyebrow"> PORTFOLIO DASHBOARD </span>
+
+                    <h1 class="dashboard-title pt-font">
+                        Welcome back, {{ user.username }}
+                    </h1>
+
+                    <p class="dashboard-subtitle">
+                        Monitor your portfolio, follow the markets and manage
+                        your paper trades.
+                    </p>
+                </div>
+
+                <div class="market-status">
+                    <span class="status-indicator"></span>
+
+                    <span id="stream-status"> Connecting... </span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         MAIN DASHBOARD
+    ========================================== -->
+
+    <main class="container dashboard-main">
+        <!-- =========================================
+             ACCOUNT SUMMARY
+        ========================================== -->
+
+        <section class="summary-grid">
+            <!-- Available Cash -->
+
+            <div class="summary-card">
+                <div class="summary-card-header">
+                    <div class="summary-icon">
+                        <i class="bi bi-wallet2"></i>
+                    </div>
+
+                    <span class="summary-label"> Available Cash </span>
+                </div>
+
+                <div class="summary-value" id="user-cash">
+                    ${{ "%.2f"|format(user.cash_balance) }}
+                </div>
+
+                <p class="summary-description">Cash available for new trades</p>
+            </div>
+
+            <!-- Portfolio Value -->
+
+            <div class="summary-card">
+                <div class="summary-card-header">
+                    <div class="summary-icon">
+                        <i class="bi bi-graph-up-arrow"></i>
+                    </div>
+
+                    <span class="summary-label"> Portfolio Value </span>
+                </div>
+
+                <div class="summary-value" id="positions-value">
+                    ${{ "%.2f"|format(holdings_value) }}
+                </div>
+
+                <p class="summary-description">
+                    Current market value of holdings
+                </p>
+            </div>
+
+            <!-- Net Worth -->
+
+            <div class="summary-card summary-card-primary">
+                <div class="summary-card-header">
+                    <div class="summary-icon">
+                        <i class="bi bi-pie-chart"></i>
+                    </div>
+
+                    <span class="summary-label"> Total Net Worth </span>
+                </div>
+
+                <div class="summary-value" id="net-worth">
+                    ${{ "%.2f"|format(user.cash_balance + holdings_value) }}
+                </div>
+
+                <p class="summary-description">
+                    Cash plus current portfolio value
+                </p>
+            </div>
+        </section>
+
+        <!-- =========================================
+             ALERTS
+        ========================================== -->
+
+        {% if success %}
+        <div
+            class="alert alert-success alert-dismissible fade show dashboard-alert"
+            role="alert">
+            <i class="bi bi-check-circle me-2"></i>
+
+            <strong>Success:</strong>
+            {{ success }}
+
+            <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="alert"
+                aria-label="Close"></button>
+        </div>
+        {% endif %} {% if error %}
+        <div
+            class="alert alert-danger alert-dismissible fade show dashboard-alert"
+            role="alert">
+            <i class="bi bi-exclamation-circle me-2"></i>
+
+            <strong>Error:</strong>
+            {{ error }}
+
+            <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="alert"
+                aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        <!-- =========================================
+             HOLDINGS + MARKET WATCH
+        ========================================== -->
+
+        <section class="dashboard-grid">
+            <!-- =====================================
+                 CURRENT HOLDINGS
+            ====================================== -->
+
+            <div class="dashboard-card holdings-card">
+                <div class="dashboard-card-header">
+                    <div>
+                        <span class="section-eyebrow"> PORTFOLIO </span>
+
+                        <h2 class="dashboard-card-title pt-font">
+                            Current Holdings
+                        </h2>
+                    </div>
+
+                    <div class="card-header-icon">
+                        <i class="bi bi-briefcase"></i>
+                    </div>
+                </div>
+
+                <!-- Temporary empty state.
+                     This will be replaced with the server-side holdings
+                     loop once the Python backend is updated. -->
+
+                <div class="holdings-empty-state">
+                    <div class="empty-state-icon">
+                        <i class="bi bi-bar-chart-line"></i>
+                    </div>
+
+                    <h5>Your portfolio</h5>
+
+                    <p>
+                        Your current positions will appear here once you start
+                        trading.
+                    </p>
+                </div>
+            </div>
+
+            <!-- =====================================
+                 LIVE MARKET WATCH
+            ====================================== -->
+
+            <div class="dashboard-card market-watch-card">
+                <div class="dashboard-card-header">
+                    <div>
+                        <span class="section-eyebrow"> LIVE MARKET DATA </span>
+
+                        <h2 class="dashboard-card-title pt-font">
+                            Market Watch
+                        </h2>
+                    </div>
+
+                    <div class="card-header-icon">
+                        <i class="bi bi-activity"></i>
+                    </div>
+                </div>
+
+                <div class="market-watch-list">
+                    {% for ticker in tickers %}
+
+                    <div class="market-watch-row">
+                        <div class="market-symbol">
+                            <span class="symbol-badge"> {{ ticker }} </span>
+                        </div>
+
+                        <div class="market-price">
+                            <span id="price-{{ ticker }}" class="price-cell">
+                                $0.00
+                            </span>
+
+                            <span
+                                id="change-{{ ticker }}"
+                                class="market-change">
+                                --
+                            </span>
+                        </div>
+                    </div>
+
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             ORDER EXECUTION
+        ========================================== -->
+
+        <section class="dashboard-card order-card">
+            <div class="dashboard-card-header">
+                <div>
+                    <span class="section-eyebrow"> TRADING </span>
+
+                    <h2 class="dashboard-card-title pt-font">Place an Order</h2>
+
+                    <p class="dashboard-card-description">
+                        Buy or sell assets using your virtual funds.
+                    </p>
+                </div>
+
+                <div class="card-header-icon">
+                    <i class="bi bi-arrow-left-right"></i>
+                </div>
+            </div>
+
+            <form action="/trade" method="POST" class="order-form">
+                <div class="order-form-field">
+                    <label for="ticker" class="form-label">
+                        Stock Symbol
+                    </label>
+
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="ticker"
+                        name="ticker"
+                        placeholder="e.g. AAPL"
+                        required
+                        onkeyup="this.value = this.value.toUpperCase()" />
+                </div>
+
+                <div class="order-form-field">
+                    <label for="quantity" class="form-label">
+                        Number of Shares
+                    </label>
+
+                    <input
+                        type="number"
+                        class="form-control"
+                        id="quantity"
+                        name="quantity"
+                        min="1"
+                        placeholder="e.g. 10"
+                        required />
+                </div>
+
+                <div class="order-form-field">
+                    <label for="trade_type" class="form-label">
+                        Order Type
+                    </label>
+
+                    <select
+                        class="form-select"
+                        id="trade_type"
+                        name="trade_type"
+                        required>
+                        <option value="BUY">Buy</option>
+
+                        <option value="SELL">Sell</option>
+                    </select>
+                </div>
+
+                <div class="order-form-action">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check2-circle me-2"></i>
+                        Execute Order
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- =========================================
+             TRANSACTION HISTORY
+        ========================================== -->
+
+        <section class="dashboard-card transaction-card">
+            <div class="dashboard-card-header">
+                <div>
+                    <span class="section-eyebrow"> ACTIVITY </span>
+
+                    <h2 class="dashboard-card-title pt-font">
+                        Transaction History
+                    </h2>
+                </div>
+
+                <div class="card-header-icon">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+            </div>
+
+            {% if transactions and transactions|length > 0 %}
+
+            <div class="table-responsive">
+                <table class="table transaction-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Action</th>
+                            <th>Shares</th>
+                            <th>Price</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for trade in transactions %}
+
+                        <tr>
+                            <td>
+                                <span class="transaction-symbol">
+                                    {{ trade.ticker }}
+                                </span>
+                            </td>
+
+                            <td>
+                                {% if trade.transaction_type == 'BUY' %}
+
+                                <span class="transaction-badge buy"> Buy </span>
+
+                                {% else %}
+
+                                <span class="transaction-badge sell">
+                                    Sell
+                                </span>
+
+                                {% endif %}
+                            </td>
+
+                            <td>{{ trade.shares }}</td>
+
+                            <td>${{ "%.2f"|format(trade.price) }}</td>
+
+                            <td
+                                class="transaction-total {% if trade.transaction_type == 'BUY' %} transaction-total-negative {% else %} transaction-total-positive {% endif %}">
+                                {% if trade.transaction_type == 'BUY' %} - {%
+                                else %} + {% endif %} ${{ "%.2f"|format(
+                                trade.shares * trade.price ) }}
+                            </td>
+                        </tr>
+
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% else %}
+
+            <div class="transaction-empty-state">
+                <div class="empty-state-icon">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+
+                <h5>No transactions yet</h5>
+
+                <p>
+                    Your trading activity will appear here once you place your
+                    first order.
+                </p>
+            </div>
+
+            {% endif %}
+        </section>
+    </main>
 </div>
-{% endif %} {% if error %}
-<div
-    class="alert alert-danger alert-dismissible fade show text-center mb-4"
-    role="alert">
-    ❌ <strong>Error:</strong> {{ error }}
-    <button
-        type="button"
-        class="btn-close"
-        data-bs-dismiss="alert"
-        aria-label="Close"></button>
-</div>
-{% endif %}
-<div class="row">
-    <!-- LEFT PANEL: Portfolio Summary & Execution Form -->
-    <div class="col-md-5">
-        <!-- Current Position Display Card -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-dark text-white text-center py-3">
-                <h6 class="text-uppercase text-muted small mb-1 font-monospace">
-                    Account Holder: {{ user.username }}
-                </h6>
-                <h5 class="mb-0 text-white">💼 Financial Net Worth Summary</h5>
-            </div>
-            <div class="card-body p-0">
-                <!-- Liquid Capital Cash -->
-                <div
-                    class="d-flex justify-content-between align-items-center border-bottom p-3">
-                    <span class="text-muted small text-uppercase fw-bold"
-                        >1. Available Cash Balance</span
-                    >
-                    <span class="fw-bold text-dark h5 mb-0" id="user-cash"
-                        >${{ "%.2f"|format(user.cash_balance) }}</span
-                    >
-                </div>
-                <!-- Row 2: Asset Market Value -->
-                <div
-                    class="d-flex justify-content-between align-items-center border-bottom p-3 bg-light">
-                    <span class="text-muted small text-uppercase fw-bold"
-                        >2. Active Positions Value</span
-                    >
-                    <span
-                        class="fw-bold text-primary h5 mb-0"
-                        id="positions-value"
-                        >${{ "%.2f"|format(holdings_value) }}</span
-                    >
-                </div>
-                <!-- Row 3: Total Consolidated Net Worth -->
-                <div
-                    class="d-flex justify-content-between align-items-center p-3 bg-dark-subtle text-dark">
-                    <span class="text-dark small text-uppercase fw-bold"
-                        >📊 Consolidated Net Worth</span
-                    >
-                    <span class="fw-bold h4 mb-0" id="net-worth"
-                        >${{ "%.2f"|format(user.cash_balance + holdings_value)
-                        }}</span
-                    >
-                </div>
-            </div>
-        </div>
 
-        <!-- Trading Desk Card Container -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">🚀 Order Execution Desk</h5>
-            </div>
-            <div class="card-body">
-                <form action="/trade" method="POST">
-                    <div class="mb-3">
-                        <label for="ticker" class="form-label"
-                            >Stock Symbol</label
-                        >
-                        <input
-                            type="text"
-                            class="form-control"
-                            id="ticker"
-                            name="ticker"
-                            placeholder="e.g. AAPL"
-                            required
-                            onkeyup="this.value = this.value.toUpperCase()" />
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="quantity" class="form-label"
-                            >Number of Shares</label
-                        >
-                        <input
-                            type="number"
-                            class="form-control"
-                            id="quantity"
-                            name="quantity"
-                            min="1"
-                            required />
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Order Action</label>
-                        <select class="form-select" name="trade_type" required>
-                            <option value="BUY">BUY Asset</option>
-                            <option value="SELL">SELL Asset</option>
-                        </select>
-                    </div>
-
-                    <div class="d-grid mt-4">
-                        <button type="submit" class="btn btn-primary">
-                            Transmit Order Request
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- RIGHT PANEL: Live Ticker Feed Monitoring Station -->
-    <div class="col-md-7">
-        <div class="card shadow-sm h-100">
-            <div
-                class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Live Market Watch Station</h5>
-                <span
-                    class="badge bg-white text-success fw-bold"
-                    id="stream-status"
-                    >Connecting...</span
-                >
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table
-                        class="table table-hover align-middle mb-0 text-center">
-                        <thead
-                            class="table-light small font-monospace text-uppercase">
-                            <tr>
-                                <th>Symbol</th>
-                                <th>Current Price</th>
-                                <th>Daily Change</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Dynamically loops through the list from your .env file -->
-                            {% for ticker in tickers %}
-                            <tr>
-                                <td>
-                                    <span
-                                        class="badge bg-dark text-white fw-bold px-3 py-2"
-                                        >{{ ticker }}</span
-                                    >
-                                </td>
-                                <td>
-                                    <span
-                                        id="price-{{ ticker }}"
-                                        class="price-cell text-muted"
-                                        >$0.00</span
-                                    >
-                                </td>
-                                <td>
-                                    <span
-                                        id="change-{{ ticker }}"
-                                        class="small text-muted"
-                                        >--</span
-                                    >
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- LOWER LAYER CONTAINER: Transaction Ledger Registry Table -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card shadow-sm mb-5">
-                <div
-                    class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        📜 Historical Activity Ledger Receipt Register
-                    </h5>
-                    <span class="badge bg-secondary text-white fw-bold"
-                        >Audit Trail</span
-                    >
-                </div>
-                <div class="card-body p-0">
-                    <!-- Jinja2 Conditional Check: Verify if data records are active -->
-                    {% if transactions and transactions|length > 0 %}
-                    <div class="table-responsive">
-                        <table
-                            class="table table-hover table-striped mb-0 text-center align-middle">
-                            <thead
-                                class="table-light text-uppercase small font-monospace">
-                                <tr>
-                                    <th>Transaction Reference ID</th>
-                                    <th>Stock Symbol</th>
-                                    <th>Order Type Action</th>
-                                    <th>Volume (Shares)</th>
-                                    <th>Executed Rate</th>
-                                    <th>Total Capital Impact</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Loop systematically across every entry passed from our database query -->
-                                {% for trade in transactions %}
-                                <tr>
-                                    <td class="text-muted small">
-                                        #{{ trade.id }}
-                                    </td>
-                                    <td>
-                                        <span
-                                            class="badge bg-light text-dark border fw-bold text-uppercase"
-                                            >{{ trade.ticker }}</span
-                                        >
-                                    </td>
-                                    <td>
-                                        {% if trade.transaction_type == 'BUY' %}
-                                        <span
-                                            class="badge bg-success-subtle text-success border border-success-subtle px-3"
-                                            >BUY</span
-                                        >
-                                        {% else %}
-                                        <span
-                                            class="badge bg-danger-subtle text-danger border border-danger-subtle px-3"
-                                            >SELL</span
-                                        >
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ trade.shares }}</td>
-                                    <td class="fw-bold text-secondary">
-                                        ${{ "%.2f"|format(trade.price) }}
-                                    </td>
-                                    <td
-                                        class="fw-bold {% if trade.transaction_type == 'BUY' %}text-danger{% else %}text-success{% endif %}">
-                                        {% if trade.transaction_type == 'BUY'
-                                        %}-{% else %}+{% endif %}${{
-                                        "%.2f"|format(trade.shares *
-                                        trade.price) }}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <!-- Fallback presentation template if the table row count returns zero entries -->
-                    <div class="text-center p-5">
-                        <p class="text-muted mb-0">
-                            No transaction receipts documented in this profile
-                            instance. Complete your initial market trade above
-                            to initialize the audit ledger track line.
-                        </p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %} {% block scripts %}
-<!-- Serves static files using FastAPI's static asset helper -->
+
 <script src="{{ url_for('static', path='js/ticker-stream.js') }}"></script>
+
 {% endblock %}
