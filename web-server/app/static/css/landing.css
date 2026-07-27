@@ -1,0 +1,413 @@
+.hero-section {
+    position: relative;
+    width: 100%;
+    min-height: 600px;
+    background-image: url("../images/market-image.jpg");
+    background-size: cover;
+    background-position: center;
+    color: white;
+    overflow: hidden;
+}
+
+/*
+--------------------------------------------------
+Gradient overlay
+--------------------------------------------------
+
+The left side is dark for text readability.
+
+The gradient gradually becomes transparent
+towards the right so the background image
+remains visible.
+*/
+
+.hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(5, 10, 20, 0.97) 0%,
+        rgba(5, 10, 20, 0.92) 20%,
+        rgba(5, 10, 20, 0.7) 40%,
+        rgba(5, 10, 20, 0.3) 65%,
+        rgba(5, 10, 20, 0.1) 100%
+    );
+
+    z-index: 1;
+}
+
+/*
+--------------------------------------------------
+Hero content
+--------------------------------------------------
+*/
+
+.hero-section .container {
+    position: relative;
+    z-index: 2;
+}
+
+.hero-content {
+    padding-top: 80px;
+    padding-bottom: 80px;
+}
+
+.hero-content h1 {
+    max-width: 650px;
+    line-height: 1.1;
+}
+
+.hero-content .lead {
+    max-width: 600px;
+
+    line-height: 1.6;
+
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/*
+--------------------------------------------------
+Feature items
+--------------------------------------------------
+*/
+
+.hero-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+
+    max-width: 700px;
+}
+
+.hero-feature {
+    display: flex;
+    align-items: flex-start;
+
+    gap: 12px;
+
+    min-width: 180px;
+}
+
+.hero-feature i {
+    font-size: 1.6rem;
+
+    color: #42ff5f;
+
+    margin-top: 2px;
+}
+
+.hero-feature h6 {
+    margin-bottom: 4px;
+
+    font-weight: 600;
+}
+
+.hero-feature p {
+    margin: 0;
+
+    font-size: 0.85rem;
+
+    color: rgba(255, 255, 255, 0.65);
+}
+
+/*
+--------------------------------------------------
+CTA button
+--------------------------------------------------
+*/
+
+.hero-content .btn-primary {
+    padding: 12px 25px;
+
+    font-weight: 600;
+}
+
+/*
+--------------------------------------------------
+Mobile
+--------------------------------------------------
+*/
+
+@media (max-width: 767px) {
+    .hero-section {
+        min-height: 700px;
+
+        background-position: 65% center;
+    }
+
+    .hero-overlay {
+        background: linear-gradient(
+            90deg,
+            rgba(5, 10, 20, 0.97) 0%,
+            rgba(5, 10, 20, 0.85) 60%,
+            rgba(5, 10, 20, 0.65) 100%
+        );
+    }
+
+    .hero-content {
+        padding: 60px 25px;
+    }
+
+    .hero-content h1 {
+        font-size: 2.2rem;
+    }
+
+    .hero-features {
+        flex-direction: column;
+
+        gap: 20px;
+    }
+}
+
+/* =========================================
+   WHY PAPERTRADER
+========================================= */
+
+.why-papertrader-section {
+    background-color: #f8f9fa;
+}
+
+.section-eyebrow {
+    display: inline-block;
+
+    font-size: 0.8rem;
+    font-weight: 700;
+
+    letter-spacing: 1.5px;
+
+    color: #0d6efd;
+}
+
+.section-title {
+    font-weight: 700;
+
+    line-height: 1.2;
+
+    color: #172033;
+}
+
+.section-intro {
+    color: #6c757d;
+
+    line-height: 1.7;
+}
+
+/* Benefit cards */
+
+.benefit-card {
+    padding: 2rem;
+
+    background-color: #ffffff;
+
+    border: 1px solid rgba(0, 0, 0, 0.05);
+
+    border-radius: 12px;
+
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.04);
+
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.benefit-card:hover {
+    transform: translateY(-5px);
+
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.benefit-icon {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 50px;
+    height: 50px;
+
+    margin-bottom: 1.5rem;
+
+    border-radius: 50%;
+
+    background-color: rgba(13, 110, 253, 0.08);
+
+    color: #0d6efd;
+
+    font-size: 1.4rem;
+}
+
+.benefit-card h5 {
+    margin-bottom: 0.75rem;
+
+    font-weight: 600;
+
+    color: #172033;
+}
+
+.benefit-card p {
+    margin-bottom: 0;
+
+    color: #6c757d;
+
+    line-height: 1.6;
+
+    font-size: 0.95rem;
+}
+
+/* =========================================
+   HOW IT WORKS
+========================================= */
+
+.how-it-works-section {
+    background-color: #ffffff;
+}
+
+.how-step {
+    position: relative;
+
+    padding: 1rem 2rem;
+}
+
+/* Number above each step */
+
+.step-number {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 38px;
+    height: 38px;
+
+    margin: 0 auto 1.5rem;
+
+    border-radius: 50%;
+
+    background-color: #0d6efd;
+
+    color: #ffffff;
+
+    font-weight: 600;
+}
+
+/* Icon */
+
+.step-icon {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 80px;
+    height: 80px;
+
+    margin: 0 auto 1.5rem;
+
+    border-radius: 50%;
+
+    background-color: #f0f6ff;
+
+    color: #0d6efd;
+
+    font-size: 2rem;
+}
+
+.how-step h5 {
+    margin-bottom: 0.75rem;
+
+    font-weight: 600;
+
+    color: #172033;
+}
+
+.how-step p {
+    max-width: 280px;
+
+    margin: 0 auto;
+
+    color: #6c757d;
+
+    line-height: 1.6;
+}
+
+/* =========================================
+   FINAL CTA
+========================================= */
+
+.final-cta-section {
+    padding: 90px 0;
+
+    background: linear-gradient(135deg, #f0f6ff 0%, #ffffff 100%);
+
+    overflow: hidden;
+}
+
+.final-cta-section h2 {
+    max-width: 600px;
+
+    font-size: 2.5rem;
+
+    font-weight: 700;
+
+    color: #172033;
+}
+
+.final-cta-section p {
+    max-width: 600px;
+
+    margin: 1rem 0 1.5rem;
+
+    color: #6c757d;
+
+    line-height: 1.7;
+}
+
+.final-cta-section small {
+    color: #6c757d;
+}
+
+/* Decorative visual */
+
+.cta-visual {
+    position: relative;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 280px;
+    height: 220px;
+
+    margin: 0 auto;
+
+    border-radius: 20px;
+
+    background-color: #ffffff;
+
+    box-shadow: 0 20px 50px rgba(13, 110, 253, 0.12);
+
+    color: #0d6efd;
+
+    font-size: 4rem;
+}
+
+.cta-chart-line {
+    position: absolute;
+
+    width: 160px;
+    height: 80px;
+
+    border-top: 3px solid #0d6efd;
+
+    transform: rotate(-15deg) translateY(15px);
+}
+
+.cta-chart-icon {
+    position: absolute;
+
+    right: 45px;
+    top: 55px;
+
+    font-size: 2rem;
+}
