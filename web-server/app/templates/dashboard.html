@@ -1,6 +1,8 @@
 {% extends "base.html" %} {% block styles %}
-<style src="{{ url_for('static', path='css/styles.css') }}"></style>
-<link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}" />
+<style src="{{ url_for('static', path='css/flashing-tickers.css') }}"></style>
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', path='css/flashing-tickers.css') }}" />
 {% endblock %} {% block content %} {% if success %}
 <div
     class="alert alert-success alert-dismissible fade show text-center mb-4"
