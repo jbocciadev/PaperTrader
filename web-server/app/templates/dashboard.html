@@ -401,7 +401,9 @@
 </div>
 
 {% endblock %} {% block scripts %}
-
+<script>
+    const sharesOwned = {{ shares_owned | tojson }};
+</script>
 <script src="{{ url_for('static', path='js/ticker-stream.js') }}"></script>
 
 {% endblock %}
