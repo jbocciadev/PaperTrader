@@ -12,7 +12,8 @@
     font-family: "Roboto", sans-serif !important;
 }
 
-.pt-font {
+.pt-font,
+.pt-font * {
     font-family: "PTFont", sans-serif !important;
 }
 .logo-main {
