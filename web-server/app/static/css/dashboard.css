@@ -318,7 +318,7 @@
 }
 
 .market-watch-list {
-    max-height: 290px;
+    max-height: 500px;
 
     overflow-y: auto;
 }
@@ -380,7 +380,7 @@
 
     color: #172033;
 
-    font-size: 0.9rem;
+    /* font-size: 0.9rem; */
     font-weight: 600;
 
     transition:
