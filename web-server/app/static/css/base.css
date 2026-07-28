@@ -7,6 +7,14 @@
     font-family: "Roboto";
     src: url("../fonts/Roboto/Roboto/Roboto-VariableFont_wdth\,wght.ttf");
 }
+:root {
+    --pt-blue: #0a58ca;
+    --pt-dark-blue: #07111f;
+}
+
+.bg-primary {
+    background-color: var(--pt-blue) !important;
+}
 
 * {
     font-family: "Roboto", sans-serif !important;
@@ -19,7 +27,7 @@
 .logo-main {
     font-weight: 800;
     letter-spacing: -0.04em; /* Tightens characters to look like a cohesive logo */
-    color: #0a58ca;
+    color: var(--pt-blue);
 }
 .logo-second {
     /* font-family: "Space Grotesk", sans-serif; */
@@ -43,7 +51,7 @@
 }
 
 .headline {
-    color: #0a58ca;
+    color: var(--pt-blue);
 }
 
 .market-image {
@@ -57,7 +65,7 @@
 
 .site-footer {
     padding: 70px 0 25px;
-    background-color: #07111f;
+    background-color: var(--pt-dark-blue);
     color: #ffffff;
 }
 
@@ -71,7 +79,7 @@
 }
 
 .footer-brand span {
-    color: #0d6efd;
+    color: var(--pt-blue);
 }
 
 .footer-description {
@@ -103,7 +111,7 @@
 }
 
 .footer-social a:hover {
-    background-color: #0d6efd;
+    background-color: var(--pt-blue);
 }
 
 /* Footer headings */
@@ -165,6 +173,27 @@
     color: #ffffff;
 }
 
+/* Login and register form cards */
+.custom-card {
+    padding: 24px;
+    background-color: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.04);
+}
+.card-header {
+    border-bottom: none;
+}
+
+.bi-arrow-repeat {
+    color: #fff;
+    background-color: var(--pt-blue);
+    /* padding: 1px; */
+}
+.bi-dash-circle {
+    color: #fff;
+    background-color: var(--bs-danger);
+}
 /* Mobile */
 
 @media (max-width: 767px) {
