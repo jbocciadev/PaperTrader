@@ -166,10 +166,54 @@
                     </div>
                 </div>
 
-                <!-- Temporary empty state.
-                     This will be replaced with the server-side holdings
-                     loop once the Python backend is updated. -->
+                {% if shares_owned %}
+                <div class="table-responsive">
+                    <table class="table holdings-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Shares</th>
+                                <th>Current Price</th>
+                                <th>Market Value</th>
+                            </tr>
+                        </thead>
 
+                        <tbody>
+                            {% for ticker, shares in shares_owned.items() %}
+                            <tr class="holding-row" data-ticker="{{ ticker }}">
+                                <td>
+                                    <span class="transaction-symbol">
+                                        {{ ticker }}
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <span class="holding-shares">
+                                        {{ shares }}
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <span
+                                        class="holding-price"
+                                        id="holding-price-{{ ticker }}">
+                                        $0.00
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <span
+                                        class="holding-value fw-semibold"
+                                        id="holding-value-{{ ticker }}">
+                                        $0.00
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
                 <div class="holdings-empty-state">
                     <div class="empty-state-icon">
                         <i class="bi bi-bar-chart-line"></i>
@@ -182,6 +226,7 @@
                         trading.
                     </p>
                 </div>
+                {% endif %}
             </div>
 
             <!-- =====================================
@@ -405,5 +450,6 @@
     const sharesOwned = {{ shares_owned | tojson }};
 </script>
 <script src="{{ url_for('static', path='js/ticker-stream.js') }}"></script>
+<script src="{{ url_for('static', path='js/holdings.js') }}"></script>
 
 {% endblock %}

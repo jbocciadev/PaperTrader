@@ -462,11 +462,13 @@
     margin-bottom: 24px;
 }
 
-.transaction-table {
+.transaction-table,
+.holdings-table {
     margin: 0;
 }
 
-.transaction-table thead th {
+.transaction-table thead th,
+.holdings-table thead th {
     padding: 14px 20px;
 
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -482,7 +484,8 @@
     text-transform: uppercase;
 }
 
-.transaction-table tbody td {
+.transaction-table tbody td,
+.holdings-table tbody td {
     padding: 16px 20px;
 
     color: #495057;

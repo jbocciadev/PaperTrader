@@ -56,6 +56,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             priceCache[ticker] = newPrice;
         }
+        document.dispatchEvent(
+            new CustomEvent("marketDataUpdated", {
+                detail: marketUpdateMatrix,
+            })
+        );
     };
 
     ws.onerror = () => {
