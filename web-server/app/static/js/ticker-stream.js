@@ -56,6 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             priceCache[ticker] = newPrice;
         }
+        // Create event for holdings.js to update holdings values
         document.dispatchEvent(
             new CustomEvent("marketDataUpdated", {
                 detail: marketUpdateMatrix,

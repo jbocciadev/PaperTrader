@@ -58,8 +58,8 @@
                     <span class="summary-label"> Available Cash </span>
                 </div>
 
-                <div class="summary-value" id="user-cash">
-                    ${{ "%.2f"|format(user.cash_balance) }}
+                <div class="summary-value usd-format" id="user-cash">
+                    {{ "%.2f"|format(user.cash_balance) }}
                 </div>
 
                 <p class="summary-description">Cash available for new trades</p>
@@ -410,13 +410,19 @@
 
                             <td>{{ trade.shares }}</td>
 
-                            <td>${{ "%.2f"|format(trade.price) }}</td>
+                            <td class="usd-format">
+                                {{ "%.2f"|format(trade.price) }}
+                            </td>
 
                             <td
-                                class="transaction-total {% if trade.transaction_type == 'BUY' %} transaction-total-negative {% else %} transaction-total-positive {% endif %}">
-                                {% if trade.transaction_type == 'BUY' %} - {%
-                                else %} + {% endif %} ${{ "%.2f"|format(
-                                trade.shares * trade.price ) }}
+                                class="transaction-total usd-format {% if trade.transaction_type == 'BUY' %} transaction-total-negative {% else %} transaction-total-positive {% endif %}">
+                                <!-- {% if trade.transaction_type == 'BUY' %} - {%
+                                else %} + {% endif %} {{ "%.2f"|format(
+                                trade.shares * trade.price ) }} -->
+                                {% if trade.transaction_type == 'BUY' %} {{ -1 *
+                                ( trade.shares * trade.price ) }} {% else %} {{
+                                "%.2f"|format( trade.shares * trade.price ) }}
+                                {% endif %}
                             </td>
                         </tr>
 
@@ -448,6 +454,7 @@
 {% endblock %} {% block scripts %}
 <script>
     const sharesOwned = {{ shares_owned | tojson }};
+    const cashBalance = {{ user.cash_balance | tojson }};
 </script>
 <script src="{{ url_for('static', path='js/ticker-stream.js') }}"></script>
 <script src="{{ url_for('static', path='js/holdings.js') }}"></script>
