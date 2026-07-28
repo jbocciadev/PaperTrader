@@ -449,37 +449,44 @@ def show_dashboard_page(
         ).order_by(Transaction.id.desc()).all() # Sort records from newst to oldest.
         
         # Calculate amount of shares held for each symbol
-        shares_inventory = {}
+        shares_owned = {}
         for trade in user_history_ledger:
             ticker = trade.ticker.upper().strip()
-            volume = trade.shares
+            # volume = trade.shares
             if trade.transaction_type.upper() == "BUY":
-                shares_inventory[ticker] = shares_inventory.get(ticker, 0) + volume
+                shares_owned[ticker] = shares_owned.get(ticker, 0) + trade.shares
             elif trade.transaction_type.upper() == "SELL":
-                shares_inventory[ticker] = shares_inventory.get(ticker, 0) - volume
+                shares_owned[ticker] = shares_owned.get(ticker, 0) - trade.shares
+
+        # Clean-up and remove possible tickers with 0 shares
+        shares_owned = {
+            ticker: shares
+            for ticker, shares in shares_owned.items()
+            if shares > 0
+        }
 
         # Calculate the combined value of all shares owned
-        holdings_value = 0.0
-        for ticker, total_shares in shares_inventory.items():
-            if total_shares > 0:
-                # Target the exact naming token
-                cache_key = f"stock:{ticker}:price"
-                live_price_raw = redis_client.get(cache_key)
+        # holdings_value = 0.0
+        # for ticker, total_shares in shares_owned.items():
+        #     if total_shares > 0:
+        #         # Target the exact naming token
+        #         cache_key = f"stock:{ticker}:price"
+        #         live_price_raw = redis_client.get(cache_key)
                 
-                # If cache is empty default to snapshot opening price
-                if live_price_raw:
-                    live_price = float(live_price_raw)
-                else:
-                    cache_key = f"stock:{ticker}:snapshot"
-                    snapshot_raw = redis_client.get(cache_key)
+        #         # If cache is empty default to snapshot opening price
+        #         if live_price_raw:
+        #             live_price = float(live_price_raw)
+        #         else:
+        #             cache_key = f"stock:{ticker}:snapshot"
+        #             snapshot_raw = redis_client.get(cache_key)
 
-                    if snapshot_raw:
-                        snapshot_data = json.loads(snapshot_raw)
-                        live_price = float(snapshot_data["o"])
-                    else:
-                        live_price = 0.0
+        #             if snapshot_raw:
+        #                 snapshot_data = json.loads(snapshot_raw)
+        #                 live_price = float(snapshot_data["o"])
+        #             else:
+        #                 live_price = 0.0
                 
-                holdings_value += (total_shares * live_price)
+        #         holdings_value += (total_shares * live_price)
 
         # If the token is good, render the dashboard, passing the user info to the jinja template
         response = templates.TemplateResponse(
@@ -488,7 +495,9 @@ def show_dashboard_page(
             context={"tickers": TICKERS_LIST,
                      "user": current_user,
                      "transactions": user_history_ledger,
-                     "holdings_value": holdings_value,
+                     "shares_owned": shares_owned,
+                     "holdings_value": 0,
+                    #  "holdings_value": holdings_value,
                      "success": success_msg,
                      "error": error_msg}
         )

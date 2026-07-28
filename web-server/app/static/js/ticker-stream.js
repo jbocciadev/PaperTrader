@@ -46,16 +46,32 @@ document.addEventListener("DOMContentLoaded", () => {
                 void priceElement.offsetWidth; // Force a synchronous layout engine DOM reflow to clear memory state
 
                 if (newPrice > oldPrice) {
-                    priceElement.classList.add("flash-up");
+                    priceElement.parentElement.parentElement.classList.add(
+                        "flash-up"
+                    );
+                    // priceElement.classList.add("flash-up");
                 } else {
-                    priceElement.classList.add("flash-down");
+                    priceElement.parentElement.parentElement.classList.add(
+                        "flash-down"
+                    );
+                    // priceElement.classList.add("flash-down");
                 }
                 setTimeout(() => {
-                    priceElement.classList.remove("flash-up", "flash-down");
+                    priceElement.parentElement.parentElement.classList.remove(
+                        "flash-up",
+                        "flash-down"
+                    );
+                    // priceElement.classList.remove("flash-up", "flash-down");
                 }, 1000);
             }
             priceCache[ticker] = newPrice;
         }
+        // Create event for holdings.js to update holdings values
+        document.dispatchEvent(
+            new CustomEvent("marketDataUpdated", {
+                detail: marketUpdateMatrix,
+            })
+        );
     };
 
     ws.onerror = () => {
