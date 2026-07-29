@@ -465,28 +465,6 @@ def show_dashboard_page(
             if shares > 0
         }
 
-        # Calculate the combined value of all shares owned
-        # holdings_value = 0.0
-        # for ticker, total_shares in shares_owned.items():
-        #     if total_shares > 0:
-        #         # Target the exact naming token
-        #         cache_key = f"stock:{ticker}:price"
-        #         live_price_raw = redis_client.get(cache_key)
-                
-        #         # If cache is empty default to snapshot opening price
-        #         if live_price_raw:
-        #             live_price = float(live_price_raw)
-        #         else:
-        #             cache_key = f"stock:{ticker}:snapshot"
-        #             snapshot_raw = redis_client.get(cache_key)
-
-        #             if snapshot_raw:
-        #                 snapshot_data = json.loads(snapshot_raw)
-        #                 live_price = float(snapshot_data["o"])
-        #             else:
-        #                 live_price = 0.0
-                
-        #         holdings_value += (total_shares * live_price)
 
         # If the token is good, render the dashboard, passing the user info to the jinja template
         response = templates.TemplateResponse(
