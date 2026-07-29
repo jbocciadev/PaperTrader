@@ -19,5 +19,15 @@ Notes:
 9/06: Moved files out of OneDrive to avoid multi-platform issues. Going forward, syncing with github only.
 13/06: Out of hours: The application will allow users to execute trades outside of US market hours. However, in a production environment, these would be prevented by checking data/time stamp.
 
+29/07: Moved away from NGINX in favour of CADDY. Site is now live under papertrader.cc
+
 ... https://stackoverflow.com/questions/1838873/visualizing-branch-topology-in-git
 ... https://gitdiagram.com/
+
+### Production Infrastructure & Security Architecture
+
+The production environment for **Paper Trader** is deployed as an isolated microservice mesh on an AWS EC2 instance, utilizing a portable, multi-container orchestration layer.
+
+- **Edge Reverse Proxy Tier:** A containerized **Caddy Server** handles all incoming public network traffic. It binds natively to ports `80` and `443` to enforce an HTTPS-only gateway, managing automated SSL/TLS certificate handshakes, installations, and renewals securely via Let's Encrypt.
+- **Encrypted ASGI Network Pipeline:** The **FastAPI** web gateway runs behind the Caddy edge block inside an isolated Docker internal network (`paper-trader-overlay`). Uvicorn is configured with `--proxy-headers` and `FORWARDED_ALLOW_IPS=*` to safely process upstream headers, ensuring all absolute asset URLs (`url_for`) render natively over secure `https://` schemas without mixed-content vulnerabilities.
+- **Microservice Inter-Container DNS Routing:** Cross-tier data transactions between the FastAPI web gateway and the Python trading execution core communicate via structured **gRPC over port 50051**, leveraging Docker's internal, sandboxed service-discovery DNS resolution.
