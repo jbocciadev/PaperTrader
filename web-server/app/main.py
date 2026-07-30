@@ -286,15 +286,19 @@ def home(
 
 # Routes for the register workflow ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
 @app.get("/register")
-def show_register_page(request: Request):
+def show_register_page(request: Request,
+                       access_token: str = Cookie(None)):
     """
     Serves the visual signup form view to the client browser.
     """
-    return templates.TemplateResponse(
-        request=request,
-        name="register.html",
-        context={"user": None}
-        )
+    if access_token:
+        return RedirectResponse(url="/dashboard", status_code=303)
+    else:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={"user": None}
+            )
 
 @app.post("/register")
 def process_registration(
@@ -311,7 +315,14 @@ def process_registration(
     
     if existing_user is not None:
         # If the username exists, return error message to the browser
-        return {"error": "Username already exists. Please choose a different name."}
+        
+        return templates.TemplateResponse(
+                request=request,
+                name="register.html",
+                context={"error": "Username already exists. Please choose a different name."}
+                )
+        # error = 
+        # return {"error": "Username already exists. Please choose a different name."}
     
     # Use hash to encrypt the passord
     hashed_pwd = bcrypt.hashpw(
@@ -335,15 +346,20 @@ def process_registration(
 
 # Routes for the login workflow ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ ¬ 
 @app.get("/login")
-def show_login_page(request: Request):
+def show_login_page(request: Request,
+                    access_token: str = Cookie(None),
+                    ):
     """
     Serves the login page to the user's browser
     """
-    return templates.TemplateResponse(
-        request=request, 
-        name="login.html",
-        context={"user":None}
-        )
+    if access_token:
+        return RedirectResponse(url="/dashboard", status_code=303)
+    else:
+        return templates.TemplateResponse(
+            request=request, 
+            name="login.html",
+            context={"user":None}
+            )
 
 @app.post("/login")
 def process_login(
@@ -571,7 +587,7 @@ async def handle_trade_route(
     
     except grpc.RpcError as error:
         # Gracefullt catch connection errrs from gRPC trading engine
-        feedback_msg =  f"Main transaction engne connection failure: {error.details()}"
+        feedback_msg = f"Main transaction engne connection failure: {error.details()}"
         redir_response = RedirectResponse(url="/dashboard", status_code=303)
         redir_response.set_cookie(key="error_msg", value=feedback_msg, max_age=10)
         return redir_response
